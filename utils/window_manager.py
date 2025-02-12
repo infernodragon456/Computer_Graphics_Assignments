@@ -16,7 +16,7 @@ class Window:
         # Create a window using glfw
         self.windowHeight = height
         self.windowWidth = width
-        self.window = glfw.create_window(width, height,"Demo", None, None)
+        self.window = glfw.create_window(width, height,"Portal Shenanigans", None, None)
 
         if not self.window:
             glfw.terminate()
@@ -37,6 +37,9 @@ class Window:
 
         # Delta time
         self.prevTime = glfw.get_time()
+
+        imgui.create_context()
+        self.impl = GlfwRenderer(self.window)
 
     def Close(self):
         glfw.terminate()
@@ -68,11 +71,16 @@ class Window:
         if glfw.get_key(self.window, glfw.KEY_SPACE) == glfw.PRESS:
             inputs.append("SPACE")
 
+        self.impl.process_inputs()
+        imgui.new_frame()
+        
         glClearColor(c0, c1, c2, c3)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         return inputs, time
     
     def EndFrame(self):
+        imgui.render()
+        self.impl.render(imgui.get_draw_data())
         glfw.swap_buffers(self.window) 
     
