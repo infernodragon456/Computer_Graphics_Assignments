@@ -1,18 +1,18 @@
 {
-    "lives": 3,
+    "lives": 2,
     "health": 100,
     "keys_collected": 0,
-    "elapsed_time": 4.8473236,
+    "elapsed_time": 6.0876673,
     "platform_data": [
         {
             "position": [
                 -300.0,
-                297.1401062011719,
+                -22.654191970825195,
                 0.0
             ],
             "movement_type": "vertical",
             "speed": 150.0,
-            "direction": 1,
+            "direction": -1,
             "bounds": [
                 -300,
                 300
@@ -21,12 +21,12 @@
         {
             "position": [
                 -100.0,
-                297.1401062011719,
+                -22.654191970825195,
                 0.0
             ],
             "movement_type": "vertical",
             "speed": 150.0,
-            "direction": 1,
+            "direction": -1,
             "bounds": [
                 -300,
                 300
@@ -35,12 +35,12 @@
         {
             "position": [
                 100.0,
-                297.1401062011719,
+                -22.654191970825195,
                 0.0
             ],
             "movement_type": "vertical",
             "speed": 150.0,
-            "direction": 1,
+            "direction": -1,
             "bounds": [
                 -300,
                 300
@@ -49,12 +49,12 @@
         {
             "position": [
                 300.0,
-                297.1401062011719,
+                -22.654191970825195,
                 0.0
             ],
             "movement_type": "vertical",
             "speed": 150.0,
-            "direction": 1,
+            "direction": -1,
             "bounds": [
                 -300,
                 300
@@ -62,7 +62,7 @@
         },
         {
             "position": [
-                37.71199035644531,
+                298.1240539550781,
                 -150.0,
                 0.0
             ],
@@ -76,13 +76,13 @@
         },
         {
             "position": [
-                237.7119903564453,
+                201.7964324951172,
                 0.0,
                 0.0
             ],
             "movement_type": "horizontal",
             "speed": 120.0,
-            "direction": 1,
+            "direction": -1,
             "bounds": [
                 -350,
                 350
@@ -90,7 +90,7 @@
         },
         {
             "position": [
-                262.1822204589844,
+                1.7537473440170288,
                 150.0,
                 0.0
             ],
@@ -133,10 +133,10 @@
         {
             "position": [
                 -250.0,
-                3.811786651611328,
+                30.050094604492188,
                 1.0
             ],
-            "direction": -1,
+            "direction": 1,
             "bounds": [
                 -200,
                 200
@@ -145,10 +145,10 @@
         {
             "position": [
                 0.0,
-                3.811786651611328,
+                30.050094604492188,
                 1.0
             ],
-            "direction": -1,
+            "direction": 1,
             "bounds": [
                 -200,
                 200
@@ -157,10 +157,10 @@
         {
             "position": [
                 250.0,
-                3.811786651611328,
+                30.050094604492188,
                 1.0
             ],
-            "direction": -1,
+            "direction": 1,
             "bounds": [
                 -200,
                 200
