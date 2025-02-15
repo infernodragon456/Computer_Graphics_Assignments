@@ -2,7 +2,7 @@ import imgui
 import numpy as np
 from utils.graphics import Object, Camera, Shader
 from assets.shaders.shaders import object_shader
-from assets.objects.objects import playerProps, backgroundProps, platformProps, keyProps
+from assets.objects.objects import playerProps, backgroundProps, platformProps, keyProps, enemyProps
 import glfw
 import copy
 import time
@@ -36,6 +36,7 @@ class Game:
         self.is_grounded = False
         self.paused = False  # Add pause state
         self.save_file = "savegame.txt"
+        self.enemies = []
 
     def InitScreen(self):
         if self.screen == 1:
@@ -93,6 +94,15 @@ class Game:
             # Set initial player position
             self.player_position = np.array([-450.0, 0.0, 1.0], dtype=np.float32)
             self.objects[1].properties['position'] = self.player_position
+
+            # Create enemies after platforms
+            enemy_positions = [-250, 0, 250]  # X positions for enemies
+            for x_pos in enemy_positions:
+                enemy_props = copy.deepcopy(enemyProps)
+                enemy_props['position'] = np.array([x_pos, 0, 1.0], dtype=np.float32)
+                enemy = Object(self.shader, enemy_props)
+                self.enemies.append(enemy)
+                self.objects.append(enemy)
 
     def ProcessFrame(self, inputs, time):
         if self.screen == -1:
@@ -537,7 +547,6 @@ class Game:
 
     def UpdateScene(self, inputs, time):
         if self.screen == 1:
-            # Add pause toggle with F key
             if "F" in inputs and self.paused == False:
                 self.paused = True
                 return  # Skip updates when newly paused
@@ -545,6 +554,21 @@ class Game:
             # Skip game updates if paused
             if self.paused:
                 return
+
+            # Update enemy positions
+            for enemy in self.enemies:
+                pos = enemy.properties['position']
+                speed = enemy.properties['speed']
+                direction = enemy.properties['direction']
+                bounds = enemy.properties['bounds']
+                
+                # Update Y position
+                new_y = pos[1] + speed * direction * time["deltaTime"]
+                # Check bounds and reverse direction if needed
+                if new_y > bounds[1] or new_y < bounds[0]:
+                    enemy.properties['direction'] *= -1
+                else:
+                    enemy.properties['position'][1] = new_y
 
             # Update platform positions first
             for platform in self.platforms:
@@ -689,6 +713,31 @@ class Game:
             self.screen = 2
             return
 
+        # Check enemy collisions
+        for enemy in self.enemies:
+            enemy_pos = enemy.properties['position']
+            distance = np.sqrt(
+                (player_pos[0] - enemy_pos[0])**2 + 
+                (player_pos[1] - enemy_pos[1])**2
+            )
+            
+            if distance < 50:  # Collision radius for enemy
+                # Deduct health
+                damage_per_second = 5
+                damage_this_frame = (damage_per_second * deltaTime)
+                if damage_this_frame > 0:
+                    self.player_health = max(0, self.player_health - damage_this_frame)
+                
+                if self.player_health <= 0 and self.player_lives > 0:
+                    self.player_lives -= 1
+                    self.player_health = 100
+                    self.player_position = np.array([-450, 0, 0], dtype=np.float32)
+                    self.player_velocity_z = 0
+                    self.is_grounded = True
+                    self.objects[1].properties['position'] = self.player_position
+                elif self.player_health <= 0:
+                    self.screen = 3  # Game Over
+
     def save_game(self):
         save_data = {
             'lives': self.player_lives,
@@ -709,6 +758,13 @@ class Game:
                     'position': key.properties['position'].tolist(),
                     'collected': key.properties['collected']
                 } for key in self.keys
+            ],
+            'enemy_data': [
+                {
+                    'position': enemy.properties['position'].tolist(),
+                    'direction': enemy.properties['direction'],
+                    'bounds': enemy.properties['bounds']
+                } for enemy in self.enemies
             ]
         }
         
@@ -764,6 +820,18 @@ class Game:
                 key = Object(self.shader, key_props)
                 self.keys.append(key)
                 self.objects.append(key)
+
+            # Clear and reload enemies
+            self.enemies = []
+            for enemy_data in save_data['enemy_data']:
+                enemy_props = copy.deepcopy(enemyProps)
+                enemy_props['position'] = np.array(enemy_data['position'], dtype=np.float32)
+                enemy_props['direction'] = enemy_data['direction']
+                enemy_props['bounds'] = enemy_data['bounds']
+                
+                enemy = Object(self.shader, enemy_props)
+                self.enemies.append(enemy)
+                self.objects.append(enemy)
 
             # Reset player position to spawn
             self.player_position = np.array([-450, 0, 0], dtype=np.float32)

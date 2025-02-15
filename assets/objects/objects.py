@@ -130,6 +130,18 @@ def CreateKey():
     
     return vertices, indices
 
+def CreateEnemy():
+    # Create a red triangle for the enemy
+    vertices = [
+        0.0,   20.0, 0.0,   1.0, 0.0, 0.0,  # Top, red color
+        20.0,  -20.0, 0.0,  1.0, 0.0, 0.0,  # Bottom right
+        -20.0, -20.0, 0.0,  1.0, 0.0, 0.0,  # Bottom left
+    ]
+    
+    indices = [0, 1, 2]  # Single triangle
+    
+    return vertices, indices
+
 playerVerts, playerInds = CreatePlayer()
 playerProps = {
     'vertices' : np.array(playerVerts, dtype = np.float32),
@@ -185,4 +197,17 @@ keyProps = {
     'rotation_z': 0.0,
     'scale': np.array([1.0, 1.0, 1], dtype=np.float32),  # Increased scale
     'collected': False
+}
+
+enemyVerts, enemyInds = CreateEnemy()
+enemyProps = {
+    'vertices': np.array(enemyVerts, dtype=np.float32),
+    'indices': np.array(enemyInds, dtype=np.uint32),
+    'position': np.array([0, 0, 0], dtype=np.float32),
+    'rotation_z': 0.0,
+    'scale': np.array([1.0, 1.0, 1.0], dtype=np.float32),
+    'movement_type': 'vertical',
+    'speed': 200.0,
+    'direction': 1,
+    'bounds': [-200, 200]  # Y-axis bounds
 }

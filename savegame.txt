@@ -1,18 +1,18 @@
 {
-    "lives": 1,
+    "lives": 3,
     "health": 100,
     "keys_collected": 0,
-    "elapsed_time": 5.272385700000001,
+    "elapsed_time": 4.8473236,
     "platform_data": [
         {
             "position": [
                 -300.0,
-                -13.310205459594727,
+                297.1401062011719,
                 0.0
             ],
             "movement_type": "vertical",
             "speed": 150.0,
-            "direction": -1,
+            "direction": 1,
             "bounds": [
                 -300,
                 300
@@ -21,12 +21,12 @@
         {
             "position": [
                 -100.0,
-                -13.310205459594727,
+                297.1401062011719,
                 0.0
             ],
             "movement_type": "vertical",
             "speed": 150.0,
-            "direction": -1,
+            "direction": 1,
             "bounds": [
                 -300,
                 300
@@ -35,12 +35,12 @@
         {
             "position": [
                 100.0,
-                -13.310205459594727,
+                297.1401062011719,
                 0.0
             ],
             "movement_type": "vertical",
             "speed": 150.0,
-            "direction": -1,
+            "direction": 1,
             "bounds": [
                 -300,
                 300
@@ -49,12 +49,12 @@
         {
             "position": [
                 300.0,
-                -13.310205459594727,
+                297.1401062011719,
                 0.0
             ],
             "movement_type": "vertical",
             "speed": 150.0,
-            "direction": -1,
+            "direction": 1,
             "bounds": [
                 -300,
                 300
@@ -62,7 +62,7 @@
         },
         {
             "position": [
-                290.54388427734375,
+                37.71199035644531,
                 -150.0,
                 0.0
             ],
@@ -76,13 +76,13 @@
         },
         {
             "position": [
-                209.37289428710938,
+                237.7119903564453,
                 0.0,
                 0.0
             ],
             "movement_type": "horizontal",
             "speed": 120.0,
-            "direction": -1,
+            "direction": 1,
             "bounds": [
                 -350,
                 350
@@ -90,7 +90,7 @@
         },
         {
             "position": [
-                9.52188491821289,
+                262.1822204589844,
                 150.0,
                 0.0
             ],
@@ -127,6 +127,44 @@
                 2.0
             ],
             "collected": false
+        }
+    ],
+    "enemy_data": [
+        {
+            "position": [
+                -250.0,
+                3.811786651611328,
+                1.0
+            ],
+            "direction": -1,
+            "bounds": [
+                -200,
+                200
+            ]
+        },
+        {
+            "position": [
+                0.0,
+                3.811786651611328,
+                1.0
+            ],
+            "direction": -1,
+            "bounds": [
+                -200,
+                200
+            ]
+        },
+        {
+            "position": [
+                250.0,
+                3.811786651611328,
+                1.0
+            ],
+            "direction": -1,
+            "bounds": [
+                -200,
+                200
+            ]
         }
     ]
 }

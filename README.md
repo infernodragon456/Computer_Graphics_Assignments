@@ -1,6 +1,6 @@
 # 2D Platformer Game
 
-A simple 2D platformer game built with Python and OpenGL where you navigate through floating platforms to collect keys while avoiding falling into water.
+A simple 2D platformer game built with Python and OpenGL where you navigate through floating platforms to collect keys while avoiding falling into water and enemies.
 
 ## Installation
 
@@ -40,7 +40,19 @@ python main.py
 ### Platforms
 - Brown circular platforms float in the water
 - Some platforms move vertically, others horizontally
-- Stand on platforms to avoid falling in water
+- Stand on platforms AND move with them to avoid falling in water
+
+### Enemies
+- Red triangular enemies patrol vertically
+- Contact with enemies deals 5 damage per second
+- Enemies continue moving even when player is on platforms
+- Strategic timing needed to avoid enemy contact
+
+### Health System
+- Player starts with 100 health points
+- Enemies reduce health by 5 HP/second on contact
+- Health resets to 100 when losing a life
+- Dying from enemy damage respawns player at left bank
 
 ### Keys
 - Yellow diamond-shaped keys are placed
@@ -54,7 +66,7 @@ python main.py
 
 ### Lives System
 - Start with 3 lives
-- Lose a life when touching water
+- Lose a life when touching water or losing all health
 - Game over when all lives are lost
 
 ### Save/Load System
@@ -64,6 +76,7 @@ python main.py
   - Current lives and health
   - Keys collected
   - Platform positions
+  - Enemy positions and states
   - Game progress
 
 ### Screens
@@ -74,6 +87,7 @@ python main.py
 
 2. **Game Screen**
    - Shows lives remaining
+   - Shows health bar
    - Shows keys collected
    - Shows elapsed time
 
@@ -90,11 +104,13 @@ python main.py
    - Quit game
 
 ## Objective
-Collect all three keys and reach the right bank to win the game. Avoid falling into the water and use the platforms strategically to reach your goal.
+Collect all three keys and reach the right bank to win the game. Avoid falling into the water and enemies while using the platforms strategically to reach your goal.
 
 ## Tips
 - Use platforms as safe zones
 - Time your jumps carefully
+- Watch enemy movement patterns
 - Save frequently in challenging sections
 - Watch platform movement patterns
 - Collect keys in a strategic order
+- Keep track of your health when near enemies
