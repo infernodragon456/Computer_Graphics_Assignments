@@ -657,7 +657,7 @@ class Game:
                 move_y -= self.player_speed
             
             # Jump with spacebar when grounded
-            if "SPACE" in inputs and self.is_grounded:
+            if "SPACE" in inputs and self.is_grounded and self.screen == 1:
                 self.player_velocity_z = self.jump_speed
                 self.is_grounded = False
             
@@ -934,8 +934,23 @@ class Game:
     def find_closest_leaf(self):
         player_pos = np.array([self.player_position[0], self.player_position[1]])
         closest_dist = float('inf')
+        second_closest_dist = float('inf')
         closest_platform = None
+        second_closest_platform = None
         
+        # Check if player is on the rightmost leaf (at [300, 0])
+       
+        for platform in self.platforms:
+            if (player_pos[0] >= 300 and self.keys_collected == 3):
+                # Create a fake "platform" for the right bank
+                right_bank = type('', (), {})()
+                right_bank.properties = {
+                    'position': np.array([450, 0, 0], dtype=np.float32),
+                    'is_active': True
+                }
+                return right_bank, 150  # Fixed distance to make it reachable
+        
+        # Normal closest leaf finding logic
         for platform in self.platforms:
             # Only consider active leaves
             if not platform.properties.get('is_active', False):
@@ -943,9 +958,21 @@ class Game:
                 
             platform_pos = platform.properties['position'][:2]
             dist = np.linalg.norm(player_pos - platform_pos)
+            
             if dist < closest_dist:
+                # Current closest becomes second closest
+                second_closest_dist = closest_dist
+                second_closest_platform = closest_platform
+                # Update closest
                 closest_dist = dist
                 closest_platform = platform
+            elif dist < second_closest_dist:
+                # Update second closest
+                second_closest_dist = dist
+                second_closest_platform = platform
         
+        # If player is on or very close to the closest leaf, return the second closest
+        if closest_dist < 1:  # Using small threshold instead of exactly 0
+            return second_closest_platform, second_closest_dist
         return closest_platform, closest_dist
 
