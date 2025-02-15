@@ -142,6 +142,57 @@ def CreateEnemy():
     
     return vertices, indices
 
+def CreateJungleBackground():
+    jungleGreen = [0.0, 0.5, 0.0]  # Darker green for jungle
+    waterColor = [0.0, 0.4, 0.6]   # Darker blue for jungle water
+
+    vertices = [
+        -500.0, 500.0, -0.9, jungleGreen[0], jungleGreen[1], jungleGreen[2],
+        -400.0, 500.0, -0.9, jungleGreen[0], jungleGreen[1], jungleGreen[2],
+        -400.0, -500.0, -0.9, jungleGreen[0], jungleGreen[1], jungleGreen[2],
+        -500.0, -500.0, -0.9, jungleGreen[0], jungleGreen[1], jungleGreen[2],
+
+        500.0, 500.0, -0.9, jungleGreen[0], jungleGreen[1], jungleGreen[2],
+        400.0, 500.0, -0.9, jungleGreen[0], jungleGreen[1], jungleGreen[2],
+        400.0, -500.0, -0.9, jungleGreen[0], jungleGreen[1], jungleGreen[2],
+        500.0, -500.0, -0.9, jungleGreen[0], jungleGreen[1], jungleGreen[2],
+
+        -400.0, 500.0, -0.9, waterColor[0], waterColor[1], waterColor[2],
+        400.0, 500.0, -0.9, waterColor[0], waterColor[1], waterColor[2],
+        400.0, -500.0, -0.9, waterColor[0], waterColor[1], waterColor[2],
+        -400.0, -500.0, -0.9, waterColor[0], waterColor[1], waterColor[2],
+    ]
+
+    indices = [
+        0,1,2, 0,3,2,
+        8,9,10, 8,11,10,
+        4,5,6, 4,7,6
+    ]
+
+    return vertices, indices
+
+def CreateLeafPlatform():
+    # Create a leaf-shaped platform
+    vertices = [0, 0, 0, 0.0, 0.8, 0.0]  # Center point, bright green
+    indices = []
+    
+    # Create leaf shape with more points on one side
+    points = 24
+    for i in range(points):
+        angle = 2 * np.pi * i / points
+        # Modify radius to create leaf shape
+        radius = 40 * (1 + 0.3 * np.sin(3 * angle))
+        vertices.extend([
+            radius * np.cos(angle), radius * np.sin(angle), 0,  # Position
+            0.0, 0.8, 0.0  # Color (bright green)
+        ])
+        if i < points - 1:
+            indices.extend([0, i + 1, i + 2])
+        else:
+            indices.extend([0, points, 1])
+    
+    return vertices, indices
+
 playerVerts, playerInds = CreatePlayer()
 playerProps = {
     'vertices' : np.array(playerVerts, dtype = np.float32),

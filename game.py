@@ -2,7 +2,7 @@ import imgui
 import numpy as np
 from utils.graphics import Object, Camera, Shader
 from assets.shaders.shaders import object_shader
-from assets.objects.objects import playerProps, backgroundProps, platformProps, keyProps, enemyProps
+from assets.objects.objects import playerProps, backgroundProps, platformProps, keyProps, enemyProps, CreateJungleBackground, CreateLeafPlatform
 import glfw
 import copy
 import time
@@ -44,8 +44,14 @@ class Game:
         self.max_oxygen = 2.0  # 2 seconds of oxygen
         self.oxygen_level = self.max_oxygen
         self.oxygen_regen_rate = 0.5  # Regenerate 0.5 oxygen per second
+        self.vine_active = False
+        self.vine_start = None
+        self.vine_end = None
+        self.vine_timer = 0
+        self.vine_duration = 0.2  # Duration of vine animation in seconds
+        self.leaf_toggle_interval = 2.0  # seconds between active/inactive states
 
-    def InitScreen(self):
+    def InitScreen(self, lives=3, health=100, keys_collected=0, elapsed_time=0):
         if self.screen == 1:
             self.start_time = glfw.get_time()
             self.keys_collected = 0
@@ -111,6 +117,71 @@ class Game:
                 self.enemies.append(enemy)
                 self.objects.append(enemy)
 
+        elif self.screen == 4:  # New jungle map
+            self.start_time = glfw.get_time()
+            self.keys_collected = 0
+            
+            # Initialize objects list with jungle background and player
+            jungle_background = copy.deepcopy(backgroundProps)
+            jungle_verts, jungle_inds = CreateJungleBackground()
+            jungle_background['vertices'] = np.array(jungle_verts, dtype=np.float32)
+            jungle_background['indices'] = np.array(jungle_inds, dtype=np.uint32)
+            
+            self.objects = [
+                Object(self.shader, jungle_background),
+                Object(self.shader, playerProps)
+            ]
+            
+            # Clear existing platforms and keys
+            self.platforms = []
+            self.keys = []
+            
+            # Create 8 leaf platforms in random positions
+            # But ensure they're well-distributed across the screen
+            leaf_positions = [
+                [-350, 200],  # Top left
+                [-150, 300],  # Top
+                [150, 250],   # Top right
+                [-300, 0],    # Middle left
+                [0, 50],      # Middle
+                [300, 0],     # Middle right
+                [-200, -200], # Bottom left
+                [200, -250]   # Bottom right
+            ]
+            
+            # Select 3 random indices for key platforms in advance
+            key_platform_indices = [1, 4, 6]  # Chosen for good distribution
+            
+            for i, pos in enumerate(leaf_positions):
+                leaf_props = copy.deepcopy(platformProps)
+                leaf_verts, leaf_inds = CreateLeafPlatform()
+                leaf_props['vertices'] = np.array(leaf_verts, dtype=np.float32)
+                leaf_props['indices'] = np.array(leaf_inds, dtype=np.uint32)
+                leaf_props['position'] = np.array([pos[0], pos[1], 0], dtype=np.float32)
+                leaf_props['is_active'] = True
+                leaf_props['phase_offset'] = (i * self.leaf_toggle_interval) / len(leaf_positions)
+                leaf_props['speed'] = 0.0  # Set speed to 0 to prevent movement
+                
+                platform = Object(self.shader, leaf_props)
+                self.platforms.append(platform)
+                self.objects.append(platform)
+                
+                # If this platform is selected for a key, create the key
+                if i in key_platform_indices:
+                    key_props = copy.deepcopy(keyProps)
+                    key_props['position'] = np.array([
+                        pos[0],  # Same x as platform
+                        pos[1] + 15,  # Slightly above platform
+                        2.0  # In front of platform
+                    ], dtype=np.float32)
+                    key = Object(self.shader, key_props)
+                    self.keys.append(key)
+                    self.objects.append(key)
+            
+            # Set initial player position
+            self.player_position = np.array([-450.0, 0.0, 1.0], dtype=np.float32)
+            self.objects[1].properties['position'] = self.player_position
+
     def ProcessFrame(self, inputs, time):
         if self.screen == -1:
             self.screen = 0  # Start at menu screen
@@ -122,7 +193,7 @@ class Game:
                 self.InitScreen()
         
         self.DrawText()
-        if self.screen == 1:  # Only update and draw scene in game mode
+        if self.screen == 1 or self.screen == 4:  # Only update and draw scene in game mode
             self.UpdateScene(inputs, time)
             self.DrawScene()
 
@@ -194,8 +265,8 @@ class Game:
             # Load Game button
             imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
             if imgui.button("Load Game", width=button_width, height=button_height):
-                if self.load_game():
-                    self.screen = 1  # Switch to game screen after successful load
+                self.load_game()
+                  # Switch to game screen after successful load
             
             imgui.dummy(0, 10)
             
@@ -375,7 +446,7 @@ class Game:
             
             imgui.end()
 
-        elif self.screen == 1:  # Game Screen
+        elif self.screen == 1 or self.screen == 4:  # Game Screen
             # Single compact HUD window in top-left
             imgui.set_next_window_position(10, 10)
             imgui.set_next_window_size(300, 120)
@@ -392,7 +463,7 @@ class Game:
             imgui.text(f"Lives: {self.player_lives}")
             
             # Map (centered)
-            map_text = f"Map: {self.screen}"
+            map_text = f"Map: {self.current_map}"
             map_width = imgui.calc_text_size(map_text).x
             imgui.set_cursor_pos(((300 - map_width) / 2, 8))
             imgui.text(map_text)
@@ -444,8 +515,90 @@ class Game:
             
             imgui.end()
 
+        # Draw pause menu if paused
+            if self.paused:
+                # Center the pause menu
+                window_width = 400
+                window_height = 300
+                imgui.set_next_window_size(window_width, window_height)
+                imgui.set_next_window_position(
+                    (self.width - window_width) / 2,
+                    (self.height - window_height) / 2
+                )
+                
+                # Style the pause menu
+                style = imgui.get_style()
+                style.window_rounding = 8
+                style.frame_rounding = 20
+                style.colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.1, 0.1, 0.1, 0.95)  # Semi-transparent dark background
+                style.colors[imgui.COLOR_TEXT] = (1.0, 1.0, 1.0, 1.0)
+                style.colors[imgui.COLOR_BUTTON] = (0.2, 0.2, 0.3, 0.8)
+                style.colors[imgui.COLOR_BUTTON_HOVERED] = (0.3, 0.3, 0.4, 1.0)
+                style.colors[imgui.COLOR_BUTTON_ACTIVE] = (0.4, 0.4, 0.5, 1.0)
+                style.colors[imgui.COLOR_TITLE_BACKGROUND_ACTIVE] = (0.1, 0.1, 0.1, 1.0)
+                style.colors[imgui.COLOR_TITLE_BACKGROUND] = (0.1, 0.1, 0.1, 1.0)
+                
+                # Create pause menu window
+                imgui.begin(
+                    "Pause Menu",
+                    flags=imgui.WINDOW_NO_RESIZE | 
+                          imgui.WINDOW_NO_MOVE | 
+                          imgui.WINDOW_NO_COLLAPSE |
+                          imgui.WINDOW_NO_TITLE_BAR
+                )
+                
+                # Center align text and buttons
+                window_width = imgui.get_window_width()
+                
+                # Title
+                title_text = "PAUSED"
+                imgui.set_window_font_scale(2.0)
+                title_width = imgui.calc_text_size(title_text).x
+                imgui.set_cursor_pos_x((window_width - title_width) * 0.5)
+                imgui.text(title_text)
+                
+                imgui.dummy(0, 20)
+                
+                # Buttons
+                button_width = 200
+                button_height = 40
+                imgui.set_window_font_scale(1.0)
+                
+                # Save Game button
+                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+                if imgui.button("Save Game", width=button_width, height=button_height):
+                    self.save_game()
+                
+                imgui.dummy(0, 10)
+                
+                # Load Game button
+                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+                if imgui.button("Load Game", width=button_width, height=button_height):
+                    if self.load_game():
+                        self.paused = False  # Unpause after successful load
+                
+                imgui.dummy(0, 10)
+                
+                # Main Menu button
+                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+                if imgui.button("Main Menu", width=button_width, height=button_height):
+                    self.screen = 0
+                    self.paused = False
+                
+                imgui.dummy(0, 10)
+                
+                # Resume button
+                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+                if imgui.button("Resume", width=button_width, height=button_height):
+                    self.paused = False
+                
+                # Instructions
+                
+                
+                imgui.end()
+
     def UpdateScene(self, inputs, time):
-        if self.screen == 1:
+        if self.screen == 1 or self.screen == 4:
             if "F" in inputs and self.paused == False:
                 self.paused = True
                 return  # Skip updates when newly paused
@@ -540,11 +693,60 @@ class Game:
 
             self.check_collisions(time["deltaTime"])
 
+            # Vine swinging mechanic (only in map 2)
+            if self.screen == 4 or self.current_map == 2:
+                if "E" in inputs and not self.vine_active:
+                    closest_leaf, dist = self.find_closest_leaf()
+                    print(closest_leaf, dist)
+                    if closest_leaf and dist < 500:  # Maximum vine range
+                        self.vine_active = True
+                        self.vine_start = self.player_position.copy()
+                        self.vine_end = closest_leaf.properties['position'].copy()
+                        self.vine_timer = 0
+                        # Immediately move player to leaf center
+                        self.player_position = closest_leaf.properties['position'].copy()
+                        self.player_velocity_z = 0
+                        self.is_grounded = True
+                
+                # Update vine animation
+                if self.vine_active:
+                    self.vine_timer += time["deltaTime"]
+                    if self.vine_timer >= self.vine_duration:
+                        self.vine_active = False
+
+            # Update leaf states in map 2
+            if self.screen == 4:
+                current_time = glfw.get_time()  # Use GLFW's time directly
+                
+                # Update each leaf's state
+                for platform in self.platforms:
+                    phase = current_time + platform.properties['phase_offset']
+                    # Toggle active state every leaf_toggle_interval seconds
+                    is_active = (phase % (2.0 * self.leaf_toggle_interval)) < self.leaf_toggle_interval
+                    platform.properties['is_active'] = is_active
+                    
+                    # Get the base position (original y position)
+                    base_y = platform.properties.get('base_y', platform.properties['position'][1])
+                    if 'base_y' not in platform.properties:
+                        platform.properties['base_y'] = base_y  # Store original y position
+                    
+                    # Update y position based on active state
+                    if is_active:
+                        platform.properties['position'][1] = base_y + 20  # Raise when active
+                    else:
+                        platform.properties['position'][1] = base_y  # Return to original position when inactive
+
     def DrawScene(self):
         self.camera.Update(self.shader)
         
+        # Draw vine if active
+        if self.vine_active:
+            # Draw a line between vine_start and vine_end
+            # Note: You'll need to implement line drawing in your graphics system
+            # This is a placeholder for where you would draw the vine
+            pass
+        
         for obj in self.objects:
-            # Only draw keys that haven't been collected
             if not (isinstance(obj, Object) and 
                    'collected' in obj.properties and 
                    obj.properties['collected']):
@@ -595,38 +797,70 @@ class Game:
             if self.player_position[2] <= 10:
                 if not self.is_drowning:
                     self.is_drowning = True
-                
-                # Deplete oxygen instead of using drowning timer
-                self.oxygen_level = max(0, self.oxygen_level - deltaTime)
-                
-                # First 2 seconds: slow movement and damage
-                if self.oxygen_level > 0:
-                    self.player_speed = self.water_speed
-                    damage = (10 * deltaTime)
-                    self.player_health = max(0, self.player_health - damage)
-                else:
-                    # After oxygen depleted: death
-                    if self.player_lives > 1:
-                        self.player_lives -= 1
-                        self.player_health = 100
-                        self.player_position = np.array([-450, 0, 0], dtype=np.float32)
-                        self.player_velocity_z = 0
-                        self.is_grounded = True
-                        self.objects[1].properties['position'] = self.player_position
-                        self.oxygen_level = self.max_oxygen  # Reset oxygen on death
-                    else:
-                        self.screen = 3
+                if self.screen == 1:  # Original water mechanics for map 1
+                    # Deplete oxygen instead of using drowning timer
+                    self.oxygen_level = max(0, self.oxygen_level - deltaTime)
                     
-                    self.is_drowning = False
+                    # First 2 seconds: slow movement and damage
+                    if self.oxygen_level > 0:
+                        self.player_speed = self.water_speed
+                        damage = (10 * deltaTime)
+                        self.player_health = max(0, self.player_health - damage)
+                    else:
+                        # After oxygen depleted: death
+                        if self.player_lives > 1:
+                            self.player_lives -= 1
+                            self.player_health = 100
+                            self.player_position = np.array([-450, 0, 0], dtype=np.float32)
+                            self.player_velocity_z = 0
+                            self.is_grounded = True
+                            self.objects[1].properties['position'] = self.player_position
+                            self.oxygen_level = self.max_oxygen  # Reset oxygen on death
+                        else:
+                            self.screen = 3
+                        
+                        self.is_drowning = False
+                
+                elif self.screen == 4:  # Modified water mechanics for map 2
+                    self.player_speed = self.water_speed  # Still slow in water
             
         else:
-            # Regenerate oxygen when out of water
+            # Out of water behavior
             self.is_drowning = False
-            self.oxygen_level = min(self.max_oxygen, self.oxygen_level + self.oxygen_regen_rate * deltaTime)
+            if self.screen == 1:  # Only regenerate oxygen in map 1
+                self.oxygen_level = min(self.max_oxygen, self.oxygen_level + self.oxygen_regen_rate * deltaTime)
             self.player_speed = self.normal_speed
 
-        # Check win condition
-        if (player_pos[0] > 400) and (player_pos[1] > -50) and (player_pos[1] < 50) and (self.keys_collected == 3):
+        # Constant oxygen depletion in map 2
+        if self.screen == 4 or self.current_map == 2:
+            depletion_rate = self.max_oxygen / 100.0  # Deplete fully in 100 seconds
+            self.oxygen_level = max(0, self.oxygen_level - depletion_rate * deltaTime)
+            if self.oxygen_level <= 0:
+                if self.player_lives > 1:
+                    self.player_lives -= 1
+                    self.player_health = 100
+                    self.player_position = np.array([-450, 0, 0], dtype=np.float32)
+                    self.player_velocity_z = 0
+                    self.is_grounded = True
+                    self.objects[1].properties['position'] = self.player_position
+                    self.oxygen_level = self.max_oxygen  # Reset oxygen on death
+                else:
+                    self.screen = 3
+
+        # Check win condition for map 1
+        if self.screen == 1 and (player_pos[0] > 400) and (player_pos[1] > -50) and (player_pos[1] < 50) and (self.keys_collected == 3):
+            self.screen = 4  # Advance to map 2
+            self.current_map = 2  # Update map number
+            self.keys_collected = 0  # Reset keys for new map
+            self.player_position = np.array([-450.0, 0.0, 1.0], dtype=np.float32)  # Reset player position
+            self.player_velocity_z = 0
+            self.is_grounded = True
+            self.InitScreen()  # Initialize map 2 (this will handle clearing and creating new objects)
+            return
+        # Check win condition for map 2
+        elif self.screen == 4 and (player_pos[0] > 400) and (player_pos[1] > -50) and (player_pos[1] < 50) and (self.keys_collected == 3):
+            #self.screen = 3  # Victory screen
+            print("Victory!")
             self.screen = 2
             return
 
@@ -657,32 +891,12 @@ class Game:
 
     def save_game(self):
         save_data = {
+            'map': self.current_map,
             'lives': self.player_lives,
             'health': self.player_health,
             'keys_collected': self.keys_collected,
             'elapsed_time': self.elapsed_time,
-            'platform_data': [
-                {
-                    'position': platform.properties['position'].tolist(),
-                    'movement_type': platform.properties['movement_type'],
-                    'speed': platform.properties['speed'],
-                    'direction': platform.properties['direction'],
-                    'bounds': platform.properties['bounds']
-                } for platform in self.platforms
-            ],
-            'key_data': [
-                {
-                    'position': key.properties['position'].tolist(),
-                    'collected': key.properties['collected']
-                } for key in self.keys
-            ],
-            'enemy_data': [
-                {
-                    'position': enemy.properties['position'].tolist(),
-                    'direction': enemy.properties['direction'],
-                    'bounds': enemy.properties['bounds']
-                } for enemy in self.enemies
-            ]
+            
         }
         
         try:
@@ -701,60 +915,14 @@ class Game:
             with open(self.save_file, 'r') as f:
                 save_data = json.load(f)
 
-            # Reset current game state
-            self.objects = [
-                Object(self.shader, backgroundProps),
-                Object(self.shader, playerProps)
-            ]
+            # Set the correct screen/map before initializing objects
+            self.screen = 1 if save_data['map'] == 1 else 4
+            self.current_map = save_data['map']
+
+            # Initialize the correct map's objects
+            self.InitScreen(lives=save_data['lives'], health=save_data['health'], keys_collected=save_data['keys_collected'], elapsed_time=save_data['elapsed_time'])
             
-            # Load player stats
-            self.player_lives = save_data['lives']
-            self.player_health = save_data['health']
-            self.keys_collected = save_data['keys_collected']
-            self.elapsed_time = save_data['elapsed_time']
             
-            # Clear and reload platforms
-            self.platforms = []
-            for platform_data in save_data['platform_data']:
-                platform_props = copy.deepcopy(platformProps)
-                platform_props['position'] = np.array(platform_data['position'], dtype=np.float32)
-                platform_props['movement_type'] = platform_data['movement_type']
-                platform_props['speed'] = platform_data['speed']
-                platform_props['direction'] = platform_data['direction']
-                platform_props['bounds'] = platform_data['bounds']
-                
-                platform = Object(self.shader, platform_props)
-                self.platforms.append(platform)
-                self.objects.append(platform)
-
-            # Clear and reload keys
-            self.keys = []
-            for key_data in save_data['key_data']:
-                key_props = copy.deepcopy(keyProps)
-                key_props['position'] = np.array(key_data['position'], dtype=np.float32)
-                key_props['collected'] = key_data['collected']
-                
-                key = Object(self.shader, key_props)
-                self.keys.append(key)
-                self.objects.append(key)
-
-            # Clear and reload enemies
-            self.enemies = []
-            for enemy_data in save_data['enemy_data']:
-                enemy_props = copy.deepcopy(enemyProps)
-                enemy_props['position'] = np.array(enemy_data['position'], dtype=np.float32)
-                enemy_props['direction'] = enemy_data['direction']
-                enemy_props['bounds'] = enemy_data['bounds']
-                
-                enemy = Object(self.shader, enemy_props)
-                self.enemies.append(enemy)
-                self.objects.append(enemy)
-
-            # Reset player position to spawn
-            self.player_position = np.array([-450, 0, 0], dtype=np.float32)
-            self.player_velocity_z = 0
-            self.is_grounded = True
-            self.objects[1].properties['position'] = self.player_position
             
             print("Game loaded successfully!")
             return True
@@ -762,4 +930,22 @@ class Game:
         except Exception as e:
             print(f"Error loading game: {e}")
             return False
+
+    def find_closest_leaf(self):
+        player_pos = np.array([self.player_position[0], self.player_position[1]])
+        closest_dist = float('inf')
+        closest_platform = None
+        
+        for platform in self.platforms:
+            # Only consider active leaves
+            if not platform.properties.get('is_active', False):
+                continue
+                
+            platform_pos = platform.properties['position'][:2]
+            dist = np.linalg.norm(player_pos - platform_pos)
+            if dist < closest_dist:
+                closest_dist = dist
+                closest_platform = platform
+        
+        return closest_platform, closest_dist
 

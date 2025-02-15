@@ -72,6 +72,8 @@ class Window:
             inputs.append("SPACE")
         if glfw.get_key(self.window, glfw.KEY_F) == glfw.PRESS:
             inputs.append("F")
+        if glfw.get_key(self.window, glfw.KEY_E) == glfw.PRESS:
+            inputs.append("E")
 
 
         self.impl.process_inputs()
