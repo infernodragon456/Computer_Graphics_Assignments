@@ -144,7 +144,7 @@ def CreateEnemy():
 
 def CreateJungleBackground():
     jungleGreen = [0.0, 0.5, 0.0]  # Darker green for jungle
-    waterColor = [0.0, 0.4, 0.6]   # Darker blue for jungle water
+    waterColor = [0.4, 0.494, 0.173]   # #667E2C converted to RGB
 
     vertices = [
         -500.0, 500.0, -0.9, jungleGreen[0], jungleGreen[1], jungleGreen[2],

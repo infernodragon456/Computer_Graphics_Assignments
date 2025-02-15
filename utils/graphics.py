@@ -96,5 +96,8 @@ class Object:
         self.vao.Use()
         self.ibo.Use()
 
-        # Issue Draw call with primitive type
-        glDrawElements(GL_TRIANGLES, self.ibo.count, GL_UNSIGNED_INT, None)
+        # Check if this is a line object (2 vertices)
+        if self.ibo.count == 2:
+            glDrawElements(GL_LINES, self.ibo.count, GL_UNSIGNED_INT, None)
+        else:
+            glDrawElements(GL_TRIANGLES, self.ibo.count, GL_UNSIGNED_INT, None)

@@ -5,7 +5,7 @@ from assets.shaders.shaders import object_shader
 from assets.objects.objects import playerProps, backgroundProps, platformProps, keyProps, enemyProps, CreateJungleBackground, CreateLeafPlatform
 import glfw
 import copy
-import time
+from OpenGL.GL import *
 import json
 import os
 
@@ -50,6 +50,18 @@ class Game:
         self.vine_timer = 0
         self.vine_duration = 0.2  # Duration of vine animation in seconds
         self.leaf_toggle_interval = 2.0  # seconds between active/inactive states
+        # Add vine line object
+        vine_vertices = np.array([0, 0, 0, 0, 0.5, 0,  # Start point (brown color)
+                                0, 0, 0, 0, 0.5, 0], dtype=np.float32)  # End point
+        vine_indices = np.array([0, 1], dtype=np.uint32)
+        
+        self.vine_object = Object(self.shader, {
+            'vertices': vine_vertices,
+            'indices': vine_indices,
+            'position': np.array([0, 0, 0], dtype=np.float32),
+            'rotation_z': 0,
+            'scale': np.array([1, 1, 1], dtype=np.float32)
+        })
 
     def InitScreen(self, lives=3, health=100, keys_collected=0, elapsed_time=0):
         if self.screen == 1:
@@ -741,10 +753,20 @@ class Game:
         
         # Draw vine if active
         if self.vine_active:
-            # Draw a line between vine_start and vine_end
-            # Note: You'll need to implement line drawing in your graphics system
-            # This is a placeholder for where you would draw the vine
-            pass
+            # Update vine vertices to connect player to target
+            vine_vertices = np.array([
+                self.vine_start[0], self.vine_start[1], self.vine_start[2], 0, 0.5, 0,
+                self.vine_end[0], self.vine_end[1], self.vine_end[2], 0, 0.5, 0
+            ], dtype=np.float32)
+            
+            # Update VBO with new vertices
+            glBindBuffer(GL_ARRAY_BUFFER, self.vine_object.vbo.ID)
+            glBufferData(GL_ARRAY_BUFFER, vine_vertices.nbytes, vine_vertices, GL_STATIC_DRAW)
+            
+            # Draw the vine line
+            glLineWidth(3.0)  # Make the line thicker
+            self.vine_object.Draw()
+            glLineWidth(1.0)  # Reset line width
         
         for obj in self.objects:
             if not (isinstance(obj, Object) and 
@@ -822,7 +844,10 @@ class Game:
                         self.is_drowning = False
                 
                 elif self.screen == 4:  # Modified water mechanics for map 2
-                    self.player_speed = self.water_speed  # Still slow in water
+                    self.player_speed = self.water_speed * 0.05
+                        
+                    
+                    
             
         else:
             # Out of water behavior
