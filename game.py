@@ -37,6 +37,13 @@ class Game:
         self.paused = False  # Add pause state
         self.save_file = "savegame.txt"
         self.enemies = []
+        self.drowning_timer = 0
+        self.is_drowning = False
+        self.normal_speed = 500.0
+        self.water_speed = 250.0
+        self.max_oxygen = 2.0  # 2 seconds of oxygen
+        self.oxygen_level = self.max_oxygen
+        self.oxygen_regen_rate = 0.5  # Regenerate 0.5 oxygen per second
 
     def InitScreen(self):
         if self.screen == 1:
@@ -368,182 +375,74 @@ class Game:
             
             imgui.end()
 
-        elif self.screen == 1:  # Game Screen - Draw HUD
-            # Update elapsed time
-            if self.start_time is not None:
-                self.elapsed_time = glfw.get_time() - self.start_time
-            
-            # Create a window for the HUD
+        elif self.screen == 1:  # Game Screen
+            # Single compact HUD window in top-left
             imgui.set_next_window_position(10, 10)
-            imgui.set_next_window_size(250, 120)  # Made taller for additional text
+            imgui.set_next_window_size(300, 120)
             
-            # Style the HUD
-            style = imgui.get_style()
-            style.window_rounding = 0
-            style.colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.0, 0.0, 0.0, 0.7)
-            
-            imgui.begin(
-                "HUD",
-                flags=imgui.WINDOW_NO_RESIZE | 
-                      imgui.WINDOW_NO_MOVE | 
-                      imgui.WINDOW_NO_COLLAPSE |
-                      imgui.WINDOW_NO_TITLE_BAR
-            )
+            imgui.begin("Game HUD", flags=imgui.WINDOW_NO_TITLE_BAR | 
+                                        imgui.WINDOW_NO_RESIZE | 
+                                        imgui.WINDOW_NO_MOVE |
+                                        imgui.WINDOW_NO_COLLAPSE)
             
             draw_list = imgui.get_window_draw_list()
-            window_pos = imgui.get_cursor_screen_pos()
-            pos_x = window_pos[0]
-            pos_y = window_pos[1]
+            pos = imgui.get_window_position()
             
-            # Draw hearts for lives
-            heart_size = 20
-            heart_spacing = 5
-            heart_color = int(0xFFFF0000)
+            # Top row: Lives, Map, Time
+            imgui.text(f"Lives: {self.player_lives}")
             
-            for i in range(self.player_lives):
-                heart_x = pos_x + (i * (heart_size + heart_spacing))
-                draw_list.add_rect_filled(
-                    heart_x, pos_y,
-                    heart_x + heart_size, pos_y + heart_size,
-                    heart_color
-                )
+            # Map (centered)
+            map_text = f"Map: {self.screen}"
+            map_width = imgui.calc_text_size(map_text).x
+            imgui.set_cursor_pos(((300 - map_width) / 2, 8))
+            imgui.text(map_text)
             
-            # Health bar dimensions
-            bar_width = 200
-            bar_height = 20
-            bar_y = pos_y + heart_size + 10
+            # Time (right-aligned)
+            self.elapsed_time += imgui.get_io().delta_time
+            time_text = f"Time: {int(self.elapsed_time)}s"
+            time_width = imgui.calc_text_size(time_text).x
+            imgui.set_cursor_pos((300 - time_width - 10, 10))
+            imgui.text(time_text)
             
-            # Calculate health percentage
-            health_percentage = self.player_health / 100.0
-            filled_width = bar_width * health_percentage
-            
-            # Colors
-            black = int(0xFF000000)
-            green = int(0xFF00FF00)
-            white = int(0xFFFFFFFF)
-            
-            # Draw black background
+            # Health bar
             draw_list.add_rect_filled(
-                pos_x, bar_y,
-                pos_x + bar_width, bar_y + bar_height,
-                black
+                pos[0] + 10, pos[1] + 30,
+                pos[0] + 210, pos[1] + 50,
+                imgui.get_color_u32_rgba(1, 0, 0, 1)
             )
             
-            # Draw green health fill
-            if health_percentage > 0:
-                draw_list.add_rect_filled(
-                    pos_x, bar_y,
-                    pos_x + filled_width, bar_y + bar_height,
-                    green
-                )
-            
-            # Draw health text
-            draw_list.add_text(
-                pos_x + (bar_width / 2) - 25, bar_y + 2,
-                white,
-                f"{int(self.player_health)}/100"
+            health_fill = (self.player_health / 100) * 200
+            draw_list.add_rect_filled(
+                pos[0] + 10, pos[1] + 30,
+                pos[0] + 10 + health_fill, pos[1] + 50,
+                imgui.get_color_u32_rgba(0, 1, 0, 1)
             )
             
-            # Draw map number and time
-            text_y = bar_y + bar_height + 10
-            draw_list.add_text(
-                pos_x, text_y,
-                white,
-                f"Map: {self.current_map}/3"
+            imgui.set_cursor_pos((220, 30))
+            imgui.text(f"{int(self.player_health)}/100")
+            
+            # Oxygen bar
+            draw_list.add_rect_filled(
+                pos[0] + 10, pos[1] + 60,
+                pos[0] + 210, pos[1] + 80,
+                imgui.get_color_u32_rgba(0.1, 0.1, 0.5, 1)
             )
             
-            # Format time as minutes:seconds
-            minutes = int(self.elapsed_time) // 60
-            seconds = int(self.elapsed_time) % 60
-            draw_list.add_text(
-                pos_x + bar_width - 70, text_y,
-                white,
-                f"Time: {minutes:02d}:{seconds:02d}"
+            oxygen_fill = (self.oxygen_level / self.max_oxygen) * 200
+            draw_list.add_rect_filled(
+                pos[0] + 10, pos[1] + 60,
+                pos[0] + 10 + oxygen_fill, pos[1] + 80,
+                imgui.get_color_u32_rgba(0.2, 0.6, 1.0, 1)
             )
+            
+            imgui.set_cursor_pos((220, 60))
+            imgui.text("Oxygen")
+            
+            # Keys
+            imgui.set_cursor_pos((10, 90))
+            imgui.text(f"Keys: {self.keys_collected}/3")
             
             imgui.end()
-
-            # Draw pause menu if paused
-            if self.paused:
-                # Center the pause menu
-                window_width = 400
-                window_height = 300
-                imgui.set_next_window_size(window_width, window_height)
-                imgui.set_next_window_position(
-                    (self.width - window_width) / 2,
-                    (self.height - window_height) / 2
-                )
-                
-                # Style the pause menu
-                style = imgui.get_style()
-                style.window_rounding = 8
-                style.frame_rounding = 20
-                style.colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.1, 0.1, 0.1, 0.95)  # Semi-transparent dark background
-                style.colors[imgui.COLOR_TEXT] = (1.0, 1.0, 1.0, 1.0)
-                style.colors[imgui.COLOR_BUTTON] = (0.2, 0.2, 0.3, 0.8)
-                style.colors[imgui.COLOR_BUTTON_HOVERED] = (0.3, 0.3, 0.4, 1.0)
-                style.colors[imgui.COLOR_BUTTON_ACTIVE] = (0.4, 0.4, 0.5, 1.0)
-                style.colors[imgui.COLOR_TITLE_BACKGROUND_ACTIVE] = (0.1, 0.1, 0.1, 1.0)
-                style.colors[imgui.COLOR_TITLE_BACKGROUND] = (0.1, 0.1, 0.1, 1.0)
-                
-                # Create pause menu window
-                imgui.begin(
-                    "Pause Menu",
-                    flags=imgui.WINDOW_NO_RESIZE | 
-                          imgui.WINDOW_NO_MOVE | 
-                          imgui.WINDOW_NO_COLLAPSE |
-                          imgui.WINDOW_NO_TITLE_BAR
-                )
-                
-                # Center align text and buttons
-                window_width = imgui.get_window_width()
-                
-                # Title
-                title_text = "PAUSED"
-                imgui.set_window_font_scale(2.0)
-                title_width = imgui.calc_text_size(title_text).x
-                imgui.set_cursor_pos_x((window_width - title_width) * 0.5)
-                imgui.text(title_text)
-                
-                imgui.dummy(0, 20)
-                
-                # Buttons
-                button_width = 200
-                button_height = 40
-                imgui.set_window_font_scale(1.0)
-                
-                # Save Game button
-                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
-                if imgui.button("Save Game", width=button_width, height=button_height):
-                    self.save_game()
-                
-                imgui.dummy(0, 10)
-                
-                # Load Game button
-                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
-                if imgui.button("Load Game", width=button_width, height=button_height):
-                    if self.load_game():
-                        self.paused = False  # Unpause after successful load
-                
-                imgui.dummy(0, 10)
-                
-                # Main Menu button
-                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
-                if imgui.button("Main Menu", width=button_width, height=button_height):
-                    self.screen = 0
-                    self.paused = False
-                
-                imgui.dummy(0, 10)
-                
-                # Resume button
-                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
-                if imgui.button("Resume", width=button_width, height=button_height):
-                    self.paused = False
-                
-                # Instructions
-                
-                
-                imgui.end()
 
     def UpdateScene(self, inputs, time):
         if self.screen == 1:
@@ -693,20 +592,38 @@ class Game:
 
         # Check if in water and not on platform
         if -400 < player_pos[0] < 400 and not self.is_grounded:
-            if self.player_position[2] <= 10:  # Small threshold for water level
-                if self.player_lives > 1:  # Changed from > 0 to > 1
-                    self.player_lives -= 1
-                    self.player_health = 100
-                    self.player_position = np.array([-450, 0, 0], dtype=np.float32)
-                    self.player_velocity_z = 0
-                    self.is_grounded = True
-                    self.objects[1].properties['position'] = self.player_position
+            if self.player_position[2] <= 10:
+                if not self.is_drowning:
+                    self.is_drowning = True
+                
+                # Deplete oxygen instead of using drowning timer
+                self.oxygen_level = max(0, self.oxygen_level - deltaTime)
+                
+                # First 2 seconds: slow movement and damage
+                if self.oxygen_level > 0:
+                    self.player_speed = self.water_speed
+                    damage = (10 * deltaTime)
+                    self.player_health = max(0, self.player_health - damage)
                 else:
-                    # Game Over
-                    self.screen = 3
-            self.player_speed = 250.0
+                    # After oxygen depleted: death
+                    if self.player_lives > 1:
+                        self.player_lives -= 1
+                        self.player_health = 100
+                        self.player_position = np.array([-450, 0, 0], dtype=np.float32)
+                        self.player_velocity_z = 0
+                        self.is_grounded = True
+                        self.objects[1].properties['position'] = self.player_position
+                        self.oxygen_level = self.max_oxygen  # Reset oxygen on death
+                    else:
+                        self.screen = 3
+                    
+                    self.is_drowning = False
+            
         else:
-            self.player_speed = 500.0
+            # Regenerate oxygen when out of water
+            self.is_drowning = False
+            self.oxygen_level = min(self.max_oxygen, self.oxygen_level + self.oxygen_regen_rate * deltaTime)
+            self.player_speed = self.normal_speed
 
         # Check win condition
         if (player_pos[0] > 400) and (player_pos[1] > -50) and (player_pos[1] < 50) and (self.keys_collected == 3):
