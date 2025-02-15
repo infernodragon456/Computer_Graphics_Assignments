@@ -70,6 +70,9 @@ class Window:
             inputs.append("D")
         if glfw.get_key(self.window, glfw.KEY_SPACE) == glfw.PRESS:
             inputs.append("SPACE")
+        if glfw.get_key(self.window, glfw.KEY_F) == glfw.PRESS:
+            inputs.append("F")
+
 
         self.impl.process_inputs()
         imgui.new_frame()

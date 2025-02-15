@@ -6,6 +6,8 @@ from assets.objects.objects import playerProps, backgroundProps, platformProps, 
 import glfw
 import copy
 import time
+import json
+import os
 
 class Game:
     def __init__(self, height, width):
@@ -32,6 +34,8 @@ class Game:
         self.jump_speed = 400.0
         self.gravity = 800.0
         self.is_grounded = False
+        self.paused = False  # Add pause state
+        self.save_file = "savegame.txt"
 
     def InitScreen(self):
         if self.screen == 1:
@@ -150,35 +154,35 @@ class Game:
             imgui.set_cursor_pos_x((window_width - title_width) * 0.5)
             imgui.text(title_text)
             
-            # Subtitle
-            subtitle_text = "Start Menu"
-            imgui.set_window_font_scale(1.5)  # Make subtitle slightly smaller than title
-            subtitle_width = imgui.calc_text_size(subtitle_text).x
-            imgui.set_cursor_pos_x((window_width - subtitle_width) * 0.5)
-            imgui.text(subtitle_text)
-            
-            imgui.set_window_font_scale(1.0)  # Reset font scale for rest of UI
-            
-            imgui.dummy(0, 20)  # Add some vertical spacing
+            imgui.dummy(0, 20)
             
             # Buttons
             button_width = 200
             button_height = 40
+            imgui.set_window_font_scale(1.0)
             
-            # Center each button
+            # Start Game button
             imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
             if imgui.button("New Game", width=button_width, height=button_height):
                 self.screen = 1
+                self.player_lives = 3
+                self.player_health = 100
+                self.keys_collected = 0
+                self.elapsed_time = 0
+                self.start_time = glfw.get_time()
                 self.InitScreen()
             
-            imgui.dummy(0, 10)  # Space between buttons
+            imgui.dummy(0, 10)
             
+            # Load Game button
             imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
             if imgui.button("Load Game", width=button_width, height=button_height):
-                pass  # Add settings functionality later
+                if self.load_game():
+                    self.screen = 1  # Switch to game screen after successful load
             
-            imgui.dummy(0, 10)  # Space between buttons
+            imgui.dummy(0, 10)
             
+            # Quit button
             imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
             if imgui.button("Quit", width=button_width, height=button_height):
                 exit(0)
@@ -325,9 +329,13 @@ class Game:
             imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
             if imgui.button("Try Again", width=button_width, height=button_height):
                 self.screen = 1
-                self.InitScreen()
+                # Reset all game parameters
                 self.player_lives = 3
                 self.player_health = 100
+                self.keys_collected = 0
+                self.elapsed_time = 0
+                self.start_time = glfw.get_time()
+                self.InitScreen()
             
             imgui.dummy(0, 10)
             
@@ -335,8 +343,11 @@ class Game:
             imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
             if imgui.button("Main Menu", width=button_width, height=button_height):
                 self.screen = 0
+                # Reset all game parameters
                 self.player_lives = 3
                 self.player_health = 100
+                self.keys_collected = 0
+                self.elapsed_time = 0
             
             imgui.dummy(0, 10)
             
@@ -442,8 +453,99 @@ class Game:
             
             imgui.end()
 
+            # Draw pause menu if paused
+            if self.paused:
+                # Center the pause menu
+                window_width = 400
+                window_height = 300
+                imgui.set_next_window_size(window_width, window_height)
+                imgui.set_next_window_position(
+                    (self.width - window_width) / 2,
+                    (self.height - window_height) / 2
+                )
+                
+                # Style the pause menu
+                style = imgui.get_style()
+                style.window_rounding = 8
+                style.frame_rounding = 20
+                style.colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.1, 0.1, 0.1, 0.95)  # Semi-transparent dark background
+                style.colors[imgui.COLOR_TEXT] = (1.0, 1.0, 1.0, 1.0)
+                style.colors[imgui.COLOR_BUTTON] = (0.2, 0.2, 0.3, 0.8)
+                style.colors[imgui.COLOR_BUTTON_HOVERED] = (0.3, 0.3, 0.4, 1.0)
+                style.colors[imgui.COLOR_BUTTON_ACTIVE] = (0.4, 0.4, 0.5, 1.0)
+                style.colors[imgui.COLOR_TITLE_BACKGROUND_ACTIVE] = (0.1, 0.1, 0.1, 1.0)
+                style.colors[imgui.COLOR_TITLE_BACKGROUND] = (0.1, 0.1, 0.1, 1.0)
+                
+                # Create pause menu window
+                imgui.begin(
+                    "Pause Menu",
+                    flags=imgui.WINDOW_NO_RESIZE | 
+                          imgui.WINDOW_NO_MOVE | 
+                          imgui.WINDOW_NO_COLLAPSE |
+                          imgui.WINDOW_NO_TITLE_BAR
+                )
+                
+                # Center align text and buttons
+                window_width = imgui.get_window_width()
+                
+                # Title
+                title_text = "PAUSED"
+                imgui.set_window_font_scale(2.0)
+                title_width = imgui.calc_text_size(title_text).x
+                imgui.set_cursor_pos_x((window_width - title_width) * 0.5)
+                imgui.text(title_text)
+                
+                imgui.dummy(0, 20)
+                
+                # Buttons
+                button_width = 200
+                button_height = 40
+                imgui.set_window_font_scale(1.0)
+                
+                # Save Game button
+                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+                if imgui.button("Save Game", width=button_width, height=button_height):
+                    self.save_game()
+                
+                imgui.dummy(0, 10)
+                
+                # Load Game button
+                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+                if imgui.button("Load Game", width=button_width, height=button_height):
+                    if self.load_game():
+                        self.paused = False  # Unpause after successful load
+                
+                imgui.dummy(0, 10)
+                
+                # Main Menu button
+                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+                if imgui.button("Main Menu", width=button_width, height=button_height):
+                    self.screen = 0
+                    self.paused = False
+                
+                imgui.dummy(0, 10)
+                
+                # Resume button
+                imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+                if imgui.button("Resume", width=button_width, height=button_height):
+                    self.paused = False
+                
+                # Instructions
+                
+                
+                imgui.end()
+
     def UpdateScene(self, inputs, time):
         if self.screen == 1:
+            # Add pause toggle with F key
+            if "F" in inputs and self.paused == False:
+                self.paused = True
+                return  # Skip updates when newly paused
+            
+            # Skip game updates if paused
+            if self.paused:
+                return
+
             # Update platform positions first
             for platform in self.platforms:
                 pos = platform.properties['position']
@@ -586,4 +688,93 @@ class Game:
         if (player_pos[0] > 400) and (player_pos[1] > -50) and (player_pos[1] < 50) and (self.keys_collected == 3):
             self.screen = 2
             return
+
+    def save_game(self):
+        save_data = {
+            'lives': self.player_lives,
+            'health': self.player_health,
+            'keys_collected': self.keys_collected,
+            'elapsed_time': self.elapsed_time,
+            'platform_data': [
+                {
+                    'position': platform.properties['position'].tolist(),
+                    'movement_type': platform.properties['movement_type'],
+                    'speed': platform.properties['speed'],
+                    'direction': platform.properties['direction'],
+                    'bounds': platform.properties['bounds']
+                } for platform in self.platforms
+            ],
+            'key_data': [
+                {
+                    'position': key.properties['position'].tolist(),
+                    'collected': key.properties['collected']
+                } for key in self.keys
+            ]
+        }
+        
+        try:
+            with open(self.save_file, 'w') as f:
+                json.dump(save_data, f, indent=4)
+            print("Game saved successfully!")
+        except Exception as e:
+            print(f"Error saving game: {e}")
+
+    def load_game(self):
+        try:
+            if not os.path.exists(self.save_file):
+                print("No save file found!")
+                return False
+
+            with open(self.save_file, 'r') as f:
+                save_data = json.load(f)
+
+            # Reset current game state
+            self.objects = [
+                Object(self.shader, backgroundProps),
+                Object(self.shader, playerProps)
+            ]
+            
+            # Load player stats
+            self.player_lives = save_data['lives']
+            self.player_health = save_data['health']
+            self.keys_collected = save_data['keys_collected']
+            self.elapsed_time = save_data['elapsed_time']
+            
+            # Clear and reload platforms
+            self.platforms = []
+            for platform_data in save_data['platform_data']:
+                platform_props = copy.deepcopy(platformProps)
+                platform_props['position'] = np.array(platform_data['position'], dtype=np.float32)
+                platform_props['movement_type'] = platform_data['movement_type']
+                platform_props['speed'] = platform_data['speed']
+                platform_props['direction'] = platform_data['direction']
+                platform_props['bounds'] = platform_data['bounds']
+                
+                platform = Object(self.shader, platform_props)
+                self.platforms.append(platform)
+                self.objects.append(platform)
+
+            # Clear and reload keys
+            self.keys = []
+            for key_data in save_data['key_data']:
+                key_props = copy.deepcopy(keyProps)
+                key_props['position'] = np.array(key_data['position'], dtype=np.float32)
+                key_props['collected'] = key_data['collected']
+                
+                key = Object(self.shader, key_props)
+                self.keys.append(key)
+                self.objects.append(key)
+
+            # Reset player position to spawn
+            self.player_position = np.array([-450, 0, 0], dtype=np.float32)
+            self.player_velocity_z = 0
+            self.is_grounded = True
+            self.objects[1].properties['position'] = self.player_position
+            
+            print("Game loaded successfully!")
+            return True
+            
+        except Exception as e:
+            print(f"Error loading game: {e}")
+            return False
 
