@@ -1,0 +1,78 @@
+{
+    "map": 2,
+    "lives": 2,
+    "health": 100,
+    "keys_collected": 0,
+    "elapsed_time": 25.12797100964235,
+    "platform_data": [
+        {
+            "position": [
+                -300.0,
+                -78.4239730834961,
+                0.0
+            ],
+            "movement_type": "vertical",
+            "speed": 100.0,
+            "direction": 1,
+            "bounds": [
+                -200,
+                0
+            ]
+        },
+        {
+            "position": [
+                0.0,
+                121.57585144042969,
+                0.0
+            ],
+            "movement_type": "vertical",
+            "speed": 100.0,
+            "direction": 1,
+            "bounds": [
+                0,
+                200
+            ]
+        },
+        {
+            "position": [
+                300.0,
+                -28.42418098449707,
+                0.0
+            ],
+            "movement_type": "vertical",
+            "speed": 100.0,
+            "direction": 1,
+            "bounds": [
+                -150,
+                50
+            ]
+        }
+    ],
+    "key_data": [
+        {
+            "position": [
+                -250.0,
+                0.0,
+                2.0
+            ],
+            "collected": false
+        },
+        {
+            "position": [
+                50.0,
+                200.0,
+                2.0
+            ],
+            "collected": false
+        },
+        {
+            "position": [
+                250.0,
+                -100.0,
+                2.0
+            ],
+            "collected": false
+        }
+    ],
+    "enemy_data": []
+}
