@@ -2,7 +2,7 @@ import imgui
 import numpy as np
 from utils.graphics import Object, Camera, Shader
 from assets.shaders.shaders import object_shader
-from assets.objects.objects import playerProps, backgroundProps, platformProps
+from assets.objects.objects import playerProps, backgroundProps, platformProps, keyProps
 import glfw
 import copy
 
@@ -25,24 +25,63 @@ class Game:
         self.player_speed = 500.0  # Increased speed to account for scaling
         self.player_position = np.array([-0.8, 0.0, 0.0], dtype=np.float32)  # Starting position
         self.platforms = []  # List to store platform objects
+        self.keys_collected = 0
+        self.keys = []  # List to store key objects
 
     def InitScreen(self):
         if self.screen == 1:
             self.start_time = glfw.get_time()
+            self.keys_collected = 0
+            
             # Create background and player
             self.objects = [
                 Object(self.shader, backgroundProps),
                 Object(self.shader, playerProps)
             ]
             
-            # Create platforms at different x positions
-            platform_x_positions = [-200, 0, 200]  # Positions across the river
-            for x_pos in platform_x_positions:
+            # Clear existing platforms and keys
+            self.platforms = []  # Reset platforms list
+            self.keys = []      # Reset keys list
+            
+            # Create vertical moving platforms
+            vertical_positions = [-300, -100, 100, 300]  # X positions
+            for x_pos in vertical_positions:
                 platform_props = copy.deepcopy(platformProps)
                 platform_props['position'] = np.array([x_pos, 0, 0], dtype=np.float32)
+                platform_props['movement_type'] = 'vertical'
+                platform_props['speed'] = 150.0
                 platform = Object(self.shader, platform_props)
                 self.platforms.append(platform)
-                self.objects.append(platform)  # Add to objects for rendering
+                self.objects.append(platform)
+
+            # Create horizontal moving platforms
+            horizontal_positions = [-200, 0, 200]  # Initial X positions
+            y_positions = [-150, 0, 150]  # Different Y heights
+            for x_pos, y_pos in zip(horizontal_positions, y_positions):
+                platform_props = copy.deepcopy(platformProps)
+                platform_props['position'] = np.array([x_pos, y_pos, 0], dtype=np.float32)
+                platform_props['movement_type'] = 'horizontal'
+                platform_props['speed'] = 120.0
+                platform_props['bounds'] = [-350, 350]  # X-axis bounds
+                platform = Object(self.shader, platform_props)
+                self.platforms.append(platform)
+                self.objects.append(platform)
+            
+            # Create keys on specific platforms
+            key_platform_indices = [0, 3, 5]  # Platforms strategically chosen for progression
+            
+            for i in key_platform_indices:
+                platform_pos = self.platforms[i].properties['position']
+                key_props = copy.deepcopy(keyProps)
+                key_props['position'] = np.array([
+                    platform_pos[0], 
+                    platform_pos[1] + 30,  # Place key above platform
+                    0
+                ], dtype=np.float32)
+                key_props['platform_index'] = i
+                key = Object(self.shader, key_props)
+                self.keys.append(key)
+                self.objects.append(key)
 
             # Set initial player position
             self.player_position = np.array([-400.0, 0.0, 0.0], dtype=np.float32)
@@ -355,15 +394,35 @@ class Game:
                 speed = platform.properties['speed']
                 direction = platform.properties['direction']
                 bounds = platform.properties['bounds']
+                movement_type = platform.properties['movement_type']
                 
-                # Update Y position
-                new_y = pos[1] + speed * direction * time["deltaTime"]
-                
-                # Check bounds and reverse direction if needed
-                if new_y > bounds[1] or new_y < bounds[0]:
-                    platform.properties['direction'] *= -1
-                else:
-                    platform.properties['position'][1] = new_y
+                if movement_type == 'vertical':
+                    # Update Y position
+                    new_y = pos[1] + speed * direction * time["deltaTime"]
+                    # Check bounds and reverse direction if needed
+                    if new_y > bounds[1] or new_y < bounds[0]:
+                        platform.properties['direction'] *= -1
+                    else:
+                        platform.properties['position'][1] = new_y
+                else:  # horizontal movement
+                    # Update X position
+                    new_x = pos[0] + speed * direction * time["deltaTime"]
+                    # Check bounds and reverse direction if needed
+                    if new_x > bounds[1] or new_x < bounds[0]:
+                        platform.properties['direction'] *= -1
+                    else:
+                        platform.properties['position'][0] = new_x
+
+            # Update key positions to follow their platforms
+            for key in self.keys:
+                if not key.properties['collected']:
+                    platform = self.platforms[key.properties['platform_index']]
+                    platform_pos = platform.properties['position']
+                    key.properties['position'] = np.array([
+                        platform_pos[0],
+                        platform_pos[1] + 30,
+                        0
+                    ], dtype=np.float32)
 
             # Update player position and check collisions
             self.objects[1].properties['position'] = np.array([
@@ -378,30 +437,47 @@ class Game:
         self.camera.Update(self.shader)
         
         for obj in self.objects:
-            obj.Draw()
-            
+            # Only draw keys that haven't been collected
+            if not (isinstance(obj, Object) and 
+                   'collected' in obj.properties and 
+                   obj.properties['collected']):
+                obj.Draw()
             
     def check_collisions(self, deltaTime):
         player_pos = self.objects[1].properties['position']
         player_radius = 30
 
+        # Check key collection
+        for key in self.keys:
+            if not key.properties['collected']:
+                key_pos = key.properties['position']
+                # Check if player touches key
+                if (abs(player_pos[0] - key_pos[0]) < 30 and
+                    abs(player_pos[1] - key_pos[1]) < 30):
+                    key.properties['collected'] = True
+                    self.keys_collected += 1
+                    print(f"Key collected! Total: {self.keys_collected}/3")
+
+        # Check win condition - now requires all keys
+        if (player_pos[0] > 400 and (player_pos[1] > -50 and player_pos[1] < 50)) and self.keys_collected == 3:
+            self.screen = 2  # Victory screen
+            return
+        elif (player_pos[0] > 400 and (player_pos[1] > -50 and player_pos[1] < 50)) and self.keys_collected != 3:
+            # Player at exit but missing keys
+            print("Collect all keys first!")
+
         # Check platform collisions
         for platform in self.platforms:
             platform_pos = platform.properties['position']
-            # Simple AABB collision check
+            # Simple AABB collision check (adjusted for thinner platforms)
             if (abs(player_pos[0] - platform_pos[0]) < 50 and  # Platform width is 100
-                abs(player_pos[1] - platform_pos[1]) < 25):    # Platform height is 50
+                abs(player_pos[1] - platform_pos[1]) < 10):    # Platform height is 20
                 # Player is on platform, don't apply water damage
                 return
 
         # Check river boundaries
         left_bank = -400.0
         right_bank = 400.0
-
-        # Check win condition
-        if np.allclose(player_pos, np.array([400, 0, 0], dtype=np.float32), rtol=1e-5):
-            self.screen = 2
-            return
 
         # Check if player is in the river
         if left_bank < player_pos[0] < right_bank:
@@ -411,11 +487,11 @@ class Game:
             if damage_this_frame > 0:
                 self.player_health = max(0, self.player_health - damage_this_frame)
             
-            if self.player_health <= 0 and self.player_lives > 0:
-                self.player_lives -= 1
-                self.player_health = 100
-                self.player_position = np.array([-450, 0, 0], dtype=np.float32)
-                self.objects[1].properties['position'] = self.player_position
+        if self.player_health <= 0 and self.player_lives > 0:
+            self.player_lives -= 1
+            self.player_health = 100
+            self.player_position = np.array([-450, 0, 0], dtype=np.float32)
+            self.objects[1].properties['position'] = self.player_position
         else:
             self.player_speed = 500.0
 
