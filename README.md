@@ -2,6 +2,8 @@
 
 A simple 2D platformer game built with Python and OpenGL where you navigate through floating platforms to collect keys while avoiding falling into water and enemies.
 
+Please watch the video for a walkthrough of the game, it is in the code folder.
+
 ## Installation
 
 1. Ensure you have Python 3.x installed
