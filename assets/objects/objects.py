@@ -95,35 +95,37 @@ def CreateBackground():
     return vertices, indices
 
 def CreatePlatform():
-    # Create a thinner rectangle
-    vertices = [
-        -50.0,  10.0, 0.0,  0.6, 0.3, 0.0,  # Top left, brown color
-        50.0,  10.0, 0.0,   0.6, 0.3, 0.0,  # Top right
-        50.0, -10.0, 0.0,   0.6, 0.3, 0.0,  # Bottom right
-        -50.0, -10.0, 0.0,  0.6, 0.3, 0.0,  # Bottom left
-    ]
+    # Create a circular platform
+    vertices = [0, 0, 0, 0.6, 0.3, 0.0]  # Center point, brown color
+    indices = []
     
-    indices = [
-        0, 1, 2,  # First triangle
-        0, 2, 3   # Second triangle
-    ]
+    # Create circle points
+    points = 32  # More points for smoother circle
+    for i in range(points):
+        angle = 2 * np.pi * i / points
+        vertices.extend([
+            40 * np.cos(angle), 40 * np.sin(angle), 0,  # Position
+            0.6, 0.3, 0.0  # Color (brown)
+        ])
+        if i < points - 1:
+            indices.extend([0, i + 1, i + 2])
+        else:
+            indices.extend([0, points, 1])  # Close the circle
     
     return vertices, indices
 
 def CreateKey():
-    # Create a simple diamond shape for the key
+    # Create a larger, brighter key
     vertices = [
-        0.0,   20.0, 0.0,   1.0, 0.84, 0.0,  # Top, gold color
-        20.0,  0.0,  0.0,   1.0, 0.84, 0.0,  # Right
-        0.0,   -20.0, 0.0,  1.0, 0.84, 0.0,  # Bottom
-        -20.0, 0.0,  0.0,   1.0, 0.84, 0.0,  # Left
+        0.0,   25.0, 0.0,   1.0, 1.0, 0.0,  # Top, bright yellow color
+        25.0,  0.0,  0.0,   1.0, 1.0, 0.0,  # Right
+        0.0,   -25.0, 0.0,  1.0, 1.0, 0.0,  # Bottom
+        -25.0, 0.0,  0.0,   1.0, 1.0, 0.0,  # Left
     ]
     
     indices = [
         0, 1, 2,  # First triangle
         0, 2, 3,  # Second triangle
-        3, 0, 1,  # Third triangle
-        3, 1, 2   # Fourth triangle
     ]
     
     return vertices, indices
@@ -181,6 +183,6 @@ keyProps = {
     'indices': np.array(keyInds, dtype=np.uint32),
     'position': np.array([0, 0, 0], dtype=np.float32),
     'rotation_z': 0.0,
-    'scale': np.array([0.5, 0.5, 1], dtype=np.float32),
-    'collected': False  # Track if key has been collected
+    'scale': np.array([1.0, 1.0, 1], dtype=np.float32),  # Increased scale
+    'collected': False
 }

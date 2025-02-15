@@ -5,12 +5,13 @@ from assets.shaders.shaders import object_shader
 from assets.objects.objects import playerProps, backgroundProps, platformProps, keyProps
 import glfw
 import copy
+import time
 
 class Game:
     def __init__(self, height, width):
         self.height = height
         self.width = width
-        self.screen = -1  # -1: uninitialized, 0: menu, 1: game, 2: victory screen
+        self.screen = -1  # -1: uninitialized, 0: menu, 1: game, 2: victory screen, 3: game over screen
         self.camera = Camera(height, width)
         self.shader = Shader(object_shader['vertex_shader'], object_shader['fragment_shader'])
         self.objects = []
@@ -27,24 +28,28 @@ class Game:
         self.platforms = []  # List to store platform objects
         self.keys_collected = 0
         self.keys = []  # List to store key objects
+        self.player_velocity_z = 0  # Changed from y to z
+        self.jump_speed = 400.0
+        self.gravity = 800.0
+        self.is_grounded = False
 
     def InitScreen(self):
         if self.screen == 1:
             self.start_time = glfw.get_time()
             self.keys_collected = 0
             
-            # Create background and player
+            # Initialize objects list with background and player in correct order
             self.objects = [
-                Object(self.shader, backgroundProps),
-                Object(self.shader, playerProps)
+                Object(self.shader, backgroundProps),  # Index 0: background
+                Object(self.shader, playerProps)       # Index 1: player
             ]
             
             # Clear existing platforms and keys
-            self.platforms = []  # Reset platforms list
-            self.keys = []      # Reset keys list
+            self.platforms = []
+            self.keys = []
             
-            # Create vertical moving platforms
-            vertical_positions = [-300, -100, 100, 300]  # X positions
+            # Create platforms after player
+            vertical_positions = [-300, -100, 100, 300]
             for x_pos in vertical_positions:
                 platform_props = copy.deepcopy(platformProps)
                 platform_props['position'] = np.array([x_pos, 0, 0], dtype=np.float32)
@@ -52,31 +57,29 @@ class Game:
                 platform_props['speed'] = 150.0
                 platform = Object(self.shader, platform_props)
                 self.platforms.append(platform)
-                self.objects.append(platform)
+                self.objects.append(platform)  # Added after player
 
-            # Create horizontal moving platforms
-            horizontal_positions = [-200, 0, 200]  # Initial X positions
-            y_positions = [-150, 0, 150]  # Different Y heights
+            horizontal_positions = [-200, 0, 200]
+            y_positions = [-150, 0, 150]
             for x_pos, y_pos in zip(horizontal_positions, y_positions):
                 platform_props = copy.deepcopy(platformProps)
                 platform_props['position'] = np.array([x_pos, y_pos, 0], dtype=np.float32)
                 platform_props['movement_type'] = 'horizontal'
                 platform_props['speed'] = 120.0
-                platform_props['bounds'] = [-350, 350]  # X-axis bounds
+                platform_props['bounds'] = [-350, 350]
                 platform = Object(self.shader, platform_props)
                 self.platforms.append(platform)
                 self.objects.append(platform)
             
-            # Create keys on specific platforms
-            key_platform_indices = [0, 3, 5]  # Platforms strategically chosen for progression
-            
+            # Create keys last
+            key_platform_indices = [0, 3, 5]
             for i in key_platform_indices:
                 platform_pos = self.platforms[i].properties['position']
                 key_props = copy.deepcopy(keyProps)
                 key_props['position'] = np.array([
                     platform_pos[0], 
-                    platform_pos[1] + 30,  # Place key above platform
-                    0
+                    platform_pos[1] + 15,
+                    2.0
                 ], dtype=np.float32)
                 key_props['platform_index'] = i
                 key = Object(self.shader, key_props)
@@ -84,7 +87,7 @@ class Game:
                 self.objects.append(key)
 
             # Set initial player position
-            self.player_position = np.array([-400.0, 0.0, 0.0], dtype=np.float32)
+            self.player_position = np.array([-450.0, 0.0, 1.0], dtype=np.float32)
             self.objects[1].properties['position'] = self.player_position
 
     def ProcessFrame(self, inputs, time):
@@ -260,6 +263,90 @@ class Game:
             
             imgui.end()
 
+        elif self.screen == 3:  # Game Over Screen
+            # Center the window
+            window_width = 1000
+            window_height = 1000
+            imgui.set_next_window_size(window_width, window_height)
+            imgui.set_next_window_position(
+                (self.width - window_width) / 2,
+                (self.height - window_height) / 2
+            )
+            
+            # Style the window
+            style = imgui.get_style()
+            style.window_rounding = 8
+            style.frame_rounding = 20
+            style.colors[imgui.COLOR_WINDOW_BACKGROUND] = (0.15, 0.05, 0.05, 1.0)  # Dark red background
+            style.colors[imgui.COLOR_TEXT] = (1.0, 0.33, 0.33, 1.0)  # Red text
+            style.colors[imgui.COLOR_BUTTON] = (0.5, 0.2, 0.2, 0.8)  # Dark red buttons
+            style.colors[imgui.COLOR_BUTTON_HOVERED] = (0.6, 0.3, 0.3, 1.0)
+            style.colors[imgui.COLOR_BUTTON_ACTIVE] = (0.7, 0.2, 0.2, 1.0)
+            style.colors[imgui.COLOR_TITLE_BACKGROUND_ACTIVE] = (0.15, 0.05, 0.05, 1.0)
+            style.colors[imgui.COLOR_TITLE_BACKGROUND] = (0.15, 0.05, 0.05, 1.0)
+            
+            # Remove window border
+            imgui.begin(
+                "Game Over", 
+                flags=imgui.WINDOW_NO_RESIZE | 
+                      imgui.WINDOW_NO_MOVE | 
+                      imgui.WINDOW_NO_COLLAPSE |
+                      imgui.WINDOW_NO_TITLE_BAR
+            )
+            
+            # Center align text
+            window_width = imgui.get_window_width()
+            
+            # Move content down to center vertically
+            imgui.dummy(0, 300)
+            
+            # Game Over text
+            title_text = "Game Over"
+            imgui.set_window_font_scale(3.0)
+            title_width = imgui.calc_text_size(title_text).x
+            imgui.set_cursor_pos_x((window_width - title_width) * 0.5)
+            imgui.text(title_text)
+            
+            # Time survived
+            time_text = f"Time Survived: {int(self.elapsed_time // 60):02d}:{int(self.elapsed_time % 60):02d}"
+            imgui.set_window_font_scale(1.5)
+            time_width = imgui.calc_text_size(time_text).x
+            imgui.set_cursor_pos_x((window_width - time_width) * 0.5)
+            imgui.text(time_text)
+            
+            imgui.dummy(0, 20)
+            
+            # Buttons
+            button_width = 200
+            button_height = 40
+            imgui.set_window_font_scale(1.0)
+            
+            # Try Again button
+            imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+            if imgui.button("Try Again", width=button_width, height=button_height):
+                self.screen = 1
+                self.InitScreen()
+                self.player_lives = 3
+                self.player_health = 100
+            
+            imgui.dummy(0, 10)
+            
+            # Main Menu button
+            imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+            if imgui.button("Main Menu", width=button_width, height=button_height):
+                self.screen = 0
+                self.player_lives = 3
+                self.player_health = 100
+            
+            imgui.dummy(0, 10)
+            
+            # Quit button
+            imgui.set_cursor_pos_x((window_width - button_width) * 0.5)
+            if imgui.button("Quit", width=button_width, height=button_height):
+                exit(0)
+            
+            imgui.end()
+
         elif self.screen == 1:  # Game Screen - Draw HUD
             # Update elapsed time
             if self.start_time is not None:
@@ -357,38 +444,7 @@ class Game:
 
     def UpdateScene(self, inputs, time):
         if self.screen == 1:
-            # Calculate movement based on input
-            move_x = 0.0
-            move_y = 0.0
-            
-            # Use the inputs provided by window_manager
-            if "W" in inputs:
-                move_y += self.player_speed
-            if "S" in inputs:
-                move_y -= self.player_speed
-            if "A" in inputs:
-                move_x -= self.player_speed
-            if "D" in inputs:
-                move_x += self.player_speed
-
-            # Normalize movement vector
-            magnitude = np.sqrt(move_x**2 + move_y**2)
-            if magnitude > 0:
-                move_x = move_x / magnitude
-                move_y = move_y / magnitude
-
-            # Store old position for collision resolution
-            old_position = self.player_position.copy()
-
-            # Update player position using deltaTime for smooth movement
-            self.player_position[0] += move_x * time["deltaTime"] * self.player_speed
-            self.player_position[1] += move_y * time["deltaTime"] * self.player_speed
-
-            # Add boundaries to keep player on screen
-            self.player_position[0] = max(-500, min(500, self.player_position[0]))
-            self.player_position[1] = max(-500, min(500, self.player_position[1]))
-
-            # Update platform positions
+            # Update platform positions first
             for platform in self.platforms:
                 pos = platform.properties['position']
                 speed = platform.properties['speed']
@@ -397,40 +453,66 @@ class Game:
                 movement_type = platform.properties['movement_type']
                 
                 if movement_type == 'vertical':
-                    # Update Y position
                     new_y = pos[1] + speed * direction * time["deltaTime"]
-                    # Check bounds and reverse direction if needed
                     if new_y > bounds[1] or new_y < bounds[0]:
                         platform.properties['direction'] *= -1
                     else:
                         platform.properties['position'][1] = new_y
                 else:  # horizontal movement
-                    # Update X position
                     new_x = pos[0] + speed * direction * time["deltaTime"]
-                    # Check bounds and reverse direction if needed
                     if new_x > bounds[1] or new_x < bounds[0]:
                         platform.properties['direction'] *= -1
                     else:
                         platform.properties['position'][0] = new_x
 
-            # Update key positions to follow their platforms
-            for key in self.keys:
-                if not key.properties['collected']:
-                    platform = self.platforms[key.properties['platform_index']]
-                    platform_pos = platform.properties['position']
-                    key.properties['position'] = np.array([
-                        platform_pos[0],
-                        platform_pos[1] + 30,
-                        0
-                    ], dtype=np.float32)
-
-            # Update player position and check collisions
+            # Player movement
+            move_x = 0.0
+            move_y = 0.0  # Added back Y movement
+            
+            if "A" in inputs:
+                move_x -= self.player_speed
+            if "D" in inputs:
+                move_x += self.player_speed
+            if "W" in inputs:  # Added back W movement
+                move_y += self.player_speed
+            if "S" in inputs:  # Added back S movement
+                move_y -= self.player_speed
+            
+            # Jump with spacebar when grounded
+            if "SPACE" in inputs and self.is_grounded:
+                self.player_velocity_z = self.jump_speed
+                self.is_grounded = False
+            
+            # Only apply gravity if player is above ground level
+            if self.player_position[2] > 0 or self.player_velocity_z > 0:
+                self.player_velocity_z -= self.gravity * time["deltaTime"]
+            else:
+                self.player_position[2] = 0
+                self.player_velocity_z = 0
+                self.is_grounded = True
+            
+            # Update position
+            self.player_position[0] += move_x * time["deltaTime"]
+            self.player_position[1] += move_y * time["deltaTime"]  # Added Y position update
+            self.player_position[2] += self.player_velocity_z * time["deltaTime"]
+            
+            # Adjusted scale calculation
+            base_scale = 20.0
+            scale_factor = base_scale + ((self.player_position[2] / 100.0) * 5)
+            
+            # Update player object position and scale
             self.objects[1].properties['position'] = np.array([
-                self.player_position[0], 
-                self.player_position[1], 
-                0
+                self.player_position[0],
+                self.player_position[1],
+                self.player_position[2]
             ], dtype=np.float32)
             
+            self.objects[1].properties['scale'] = np.array([
+                scale_factor,
+                scale_factor,
+                1.0
+            ], dtype=np.float32)
+
             self.check_collisions(time["deltaTime"])
 
     def DrawScene(self):
@@ -447,51 +529,61 @@ class Game:
         player_pos = self.objects[1].properties['position']
         player_radius = 30
 
-        # Check key collection
-        for key in self.keys:
-            if not key.properties['collected']:
-                key_pos = key.properties['position']
-                # Check if player touches key
-                if (abs(player_pos[0] - key_pos[0]) < 30 and
-                    abs(player_pos[1] - key_pos[1]) < 30):
-                    key.properties['collected'] = True
-                    self.keys_collected += 1
-                    print(f"Key collected! Total: {self.keys_collected}/3")
-
-        # Check win condition - now requires all keys
-        if (player_pos[0] > 400 and (player_pos[1] > -50 and player_pos[1] < 50)) and self.keys_collected == 3:
-            self.screen = 2  # Victory screen
-            return
-        elif (player_pos[0] > 400 and (player_pos[1] > -50 and player_pos[1] < 50)) and self.keys_collected != 3:
-            # Player at exit but missing keys
-            print("Collect all keys first!")
+        self.is_grounded = False
 
         # Check platform collisions
         for platform in self.platforms:
             platform_pos = platform.properties['position']
-            # Simple AABB collision check (adjusted for thinner platforms)
-            if (abs(player_pos[0] - platform_pos[0]) < 50 and  # Platform width is 100
-                abs(player_pos[1] - platform_pos[1]) < 10):    # Platform height is 20
-                # Player is on platform, don't apply water damage
-                return
-
-        # Check river boundaries
-        left_bank = -400.0
-        right_bank = 400.0
-
-        # Check if player is in the river
-        if left_bank < player_pos[0] < right_bank:
-            self.player_speed = 250.0
-            damage_per_second = 5
-            damage_this_frame = int(damage_per_second * deltaTime)
-            if damage_this_frame > 0:
-                self.player_health = max(0, self.player_health - damage_this_frame)
+            distance = np.sqrt(
+                (player_pos[0] - platform_pos[0])**2 + 
+                (player_pos[1] - platform_pos[1])**2
+            )
             
-        if self.player_health <= 0 and self.player_lives > 0:
-            self.player_lives -= 1
-            self.player_health = 100
-            self.player_position = np.array([-450, 0, 0], dtype=np.float32)
-            self.objects[1].properties['position'] = self.player_position
+            if distance < 60:
+                if player_pos[2] > platform_pos[2]:
+                    self.is_grounded = True
+                    self.player_position[2] = platform_pos[2] + 40
+                    self.player_velocity_z = 0
+
+        # Check key collection
+        for key in self.keys:
+            if not key.properties['collected']:
+                key_pos = key.properties['position']
+                key_distance = np.sqrt(
+                    (player_pos[0] - key_pos[0])**2 + 
+                    (player_pos[1] - key_pos[1])**2
+                )
+                if key_distance < 70:
+                    key.properties['collected'] = True
+                    self.keys_collected += 1
+                    print(f"Key collected! Total: {self.keys_collected}/3")
+
+        # Ground (banks) collision
+        if self.player_position[0] <= -400 or self.player_position[0] >= 400:
+            if self.player_position[2] <= 0:
+                self.player_position[2] = 0
+                self.player_velocity_z = 0
+                self.is_grounded = True
+
+        # Check if in water and not on platform
+        if -400 < player_pos[0] < 400 and not self.is_grounded:
+            if self.player_position[2] <= 10:  # Small threshold for water level
+                if self.player_lives > 1:  # Changed from > 0 to > 1
+                    self.player_lives -= 1
+                    self.player_health = 100
+                    self.player_position = np.array([-450, 0, 0], dtype=np.float32)
+                    self.player_velocity_z = 0
+                    self.is_grounded = True
+                    self.objects[1].properties['position'] = self.player_position
+                else:
+                    # Game Over
+                    self.screen = 3
+            self.player_speed = 250.0
         else:
             self.player_speed = 500.0
+
+        # Check win condition
+        if (player_pos[0] > 400) and (player_pos[1] > -50) and (player_pos[1] < 50) and (self.keys_collected == 3):
+            self.screen = 2
+            return
 
