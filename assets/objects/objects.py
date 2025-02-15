@@ -94,13 +94,29 @@ def CreateBackground():
 
     return vertices, indices
 
+def CreatePlatform():
+    # Create a simple rectangle
+    vertices = [
+        -50.0,  25.0, 0.0,  0.6, 0.3, 0.0,  # Top left, brown color
+        50.0,  25.0, 0.0,   0.6, 0.3, 0.0,  # Top right
+        50.0, -25.0, 0.0,   0.6, 0.3, 0.0,  # Bottom right
+        -50.0, -25.0, 0.0,  0.6, 0.3, 0.0,  # Bottom left
+    ]
+    
+    indices = [
+        0, 1, 2,  # First triangle
+        0, 2, 3   # Second triangle
+    ]
+    
+    return vertices, indices
+
 playerVerts, playerInds = CreatePlayer()
 playerProps = {
     'vertices' : np.array(playerVerts, dtype = np.float32),
     
     'indices' : np.array(playerInds, dtype = np.uint32),
 
-    'position' : np.array([0, 0, 0], dtype = np.float32),
+    'position' : np.array([-0.8, 0, 0], dtype = np.float32),
 
     'rotation_z' : 0.0,
 
@@ -126,4 +142,16 @@ backgroundProps = {
     'boundary' : [500.0, -500.0, 500.0, 500.0],
 
     'river_banks': [-400.0, 400.0]
+}
+
+platformVerts, platformInds = CreatePlatform()
+platformProps = {
+    'vertices': np.array(platformVerts, dtype=np.float32),
+    'indices': np.array(platformInds, dtype=np.uint32),
+    'position': np.array([0, 0, 0], dtype=np.float32),
+    'rotation_z': 0.0,
+    'scale': np.array([1, 1, 1], dtype=np.float32),
+    'speed': 100.0,  # Movement speed
+    'direction': 1,  # 1 for up, -1 for down
+    'bounds': [-300, 300]  # Y-axis movement bounds
 }
