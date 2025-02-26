@@ -4,7 +4,7 @@ import imgui
 from imgui.integrations.glfw import GlfwRenderer
 
 class Window:
-    def __init__(self, height, width):
+    def __init__(self):
 
         # Initialize glfw
         glfw.init()
@@ -13,10 +13,18 @@ class Window:
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, GL_TRUE)
         
+        # Get the primary monitor for fullscreen
+        monitor = glfw.get_primary_monitor()
+
+        # Get the monitor's video mode (resolution, refresh rate)
+        mode = glfw.get_video_mode(monitor)
+
         # Create a window using glfw
-        self.windowHeight = height
-        self.windowWidth = width
-        self.window = glfw.create_window(width, height,"Portal Shenanigans", None, None)
+        self.windowHeight = mode.size.height
+        self.windowWidth = mode.size.width
+
+        self.window = glfw.create_window(self.windowWidth, self.windowWidth, "Space Heist", None, None)
+        # Pass 2nd last parameter as 'monitor' instead of None for fullscreen experience
 
         if not self.window:
             glfw.terminate()
@@ -24,8 +32,12 @@ class Window:
             exit()
 
         # Set initial position on the screen and activate it
-        glfw.set_window_pos(self.window, 450, 30) 
+        glfw.set_window_pos(self.window, 0, 0) 
         glfw.make_context_current(self.window)
+        
+        # Initialize ImGUI
+        imgui.create_context()
+        self.impl = GlfwRenderer(self.window)
 
         # Enable Depth and blending
         glEnable(GL_DEPTH_TEST)
@@ -38,10 +50,8 @@ class Window:
         # Delta time
         self.prevTime = glfw.get_time()
 
-        imgui.create_context()
-        self.impl = GlfwRenderer(self.window)
-
     def Close(self):
+        self.impl.shutdown()
         glfw.terminate()
     
     def IsOpen(self):
@@ -55,37 +65,57 @@ class Window:
 
         glfw.poll_events()
         
-        inputs = []
+        inputs = {
+            "1":False,
+            "W":False,
+            "S":False,
+            "A":False,
+            "D":False,
+            "Q":False,
+            "E":False,
+            "SPACE":False,
+            "L_SHIFT":False,
+            "R_CLICK":False,
+            "L_CLICK":False,
+            "mouseDelta": [0.0,0.0] # Get mouse offset from center per frame
+            }
+        
         if glfw.get_key(self.window, glfw.KEY_1) == glfw.PRESS:
-            inputs.append("1")
-        if glfw.get_key(self.window, glfw.KEY_2) == glfw.PRESS:
-            inputs.append("2")
+            inputs["1"] = True
         if glfw.get_key(self.window, glfw.KEY_W) == glfw.PRESS:
-            inputs.append("W")
+            inputs["W"] = True
         if glfw.get_key(self.window, glfw.KEY_A) == glfw.PRESS:
-            inputs.append("A")
+            inputs["A"] = True
         if glfw.get_key(self.window, glfw.KEY_S) == glfw.PRESS:
-            inputs.append("S")
+            inputs["S"] = True
         if glfw.get_key(self.window, glfw.KEY_D) == glfw.PRESS:
-            inputs.append("D")
-        if glfw.get_key(self.window, glfw.KEY_SPACE) == glfw.PRESS:
-            inputs.append("SPACE")
-        if glfw.get_key(self.window, glfw.KEY_F) == glfw.PRESS:
-            inputs.append("F")
+            inputs["D"] = True
+        if glfw.get_key(self.window, glfw.KEY_Q) == glfw.PRESS:
+            inputs["Q"] = True
         if glfw.get_key(self.window, glfw.KEY_E) == glfw.PRESS:
-            inputs.append("E")
+            inputs["E"] = True
+        if glfw.get_key(self.window, glfw.KEY_SPACE) == glfw.PRESS:
+            inputs["SPACE"] = True
+        if glfw.get_key(self.window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS:
+            inputs["L_SHIFT"] = True
+        if glfw.get_mouse_button(self.window, glfw.MOUSE_BUTTON_RIGHT) == glfw.PRESS:
+            inputs["R_CLICK"] = True
+        if glfw.get_mouse_button(self.window, glfw.MOUSE_BUTTON_LEFT) == glfw.PRESS:
+            inputs["L_CLICK"] = True
 
+        xpos, ypos = glfw.get_cursor_pos(self.window)
+        inputs["mouseDelta"] = [xpos - self.windowWidth/2, ypos - self.windowHeight/2]
 
         self.impl.process_inputs()
-        imgui.new_frame()
-        
+
         glClearColor(c0, c1, c2, c3)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         return inputs, time
     
     def EndFrame(self):
-        imgui.render()
-        self.impl.render(imgui.get_draw_data())
+        # Can manually set the position of mouse to center of screen per frame
+        # glfw.set_cursor_pos(self.window, self.windowWidth/2, self.windowHeight/2) 
+        
         glfw.swap_buffers(self.window) 
     

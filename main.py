@@ -3,9 +3,9 @@ from utils.window_manager import Window
 from game import Game
 
 class App:
-    def __init__(self, width, height):
-        self.window = Window(height, width)
-        self.game = Game(height, width)
+    def __init__(self):
+        self.window = Window()
+        self.game = Game(self.window.windowHeight, self.window.windowWidth, self.window.impl)
 
     def RenderLoop(self):
 
@@ -17,7 +17,7 @@ class App:
         self.window.Close()
 
 if __name__ == "__main__":
-    app = App(1000, 1000)
+    app = App()
     app.RenderLoop()
 
 
