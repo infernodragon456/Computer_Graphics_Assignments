@@ -52,57 +52,81 @@ class Camera:
     def __init__(self, height, width):
         self.height = height
         self.width = width
-        self.position = np.array([50,0,0], dtype=np.float32)
-        self.lookAt = np.array([0,0,0], dtype=np.float32)
+        self.position = np.array([0,0,0], dtype=np.float32)
+        self.lookAt = np.array([0,1,0], dtype=np.float32)  # Initialize with non-zero vector
         self.up = np.array([0,0,1], dtype=np.float32)
         self.near = 1.0
         self.far = 10000.0
         self.fov = 90
-
         self.f = 1.0
 
     def Update(self, shader):
+        print("Camera Update:")
+        print(f"Position: {self.position}")
+        print(f"LookAt: {self.lookAt}")
+        print(f"Up: {self.up}")
+
         shader.Use()
 
         # View matrix
-
         viewTranslate = np.array([  [1, 0, 0, -self.position[0]],
                                     [0, 1, 0, -self.position[1]],
                                     [0, 0, 1, -self.position[2]],
                                     [0, 0, 0, 1]], dtype = np.float32)
         
-        n = - self.lookAt / np.linalg.norm(self.lookAt)
+        # Calculate look direction (normalize safely)
+        look_dir = self.lookAt - self.position  # Calculate direction vector
+        look_norm = np.linalg.norm(look_dir)
+        if look_norm < 1e-10:  # Check if vector is too small
+            n = np.array([0, 1, 0], dtype=np.float32)  # Default forward direction
+            print("Warning: lookAt - position is zero, using default direction")
+        else:
+            n = -look_dir / look_norm
         
+        print(f"Look direction (n): {n}")
+        
+        # Calculate right vector
         u = np.cross(self.up, n)
-        u = u / np.linalg.norm(u)
+        u_norm = np.linalg.norm(u)
+        if u_norm < 1e-10:
+            u = np.array([1, 0, 0], dtype=np.float32)  # Default right direction
+            print("Warning: up × n is zero, using default right vector")
+        else:
+            u = u / u_norm
+        
+        print(f"Right vector (u): {u}")
 
+        # Calculate up vector
         v = np.cross(n, u)
         v = v / np.linalg.norm(v)
+        
+        print(f"Up vector (v): {v}")
 
-        viewRotate = np.array([[u[0], u[1], u[2],0],
-                            [v[0], v[1], v[2],0],
-                            [n[0], n[1], n[2],0],
-                            [  0,    0,    0, 1]], dtype = np.float32)
+        viewRotate = np.array([[u[0], u[1], u[2], 0],
+                            [v[0], v[1], v[2], 0],
+                            [n[0], n[1], n[2], 0],
+                            [0, 0, 0, 1]], dtype=np.float32)
 
         viewMatrix = viewRotate @ viewTranslate
         
         # Projection matrix
-
-        orthoTranslate = np.array([  [1,0,0,0],
-                                    [0,1,0,0],
-                                    [0,0,1, (self.near + self.far)/2.0],
-                                    [0,0,0,1]], dtype = np.float32)
+        orthoTranslate = np.array([[1,0,0,0],
+                                [0,1,0,0],
+                                [0,0,1,(self.near + self.far)/2.0],
+                                [0,0,0,1]], dtype=np.float32)
         
         fovRadians = np.radians(self.fov/2)
         cameraHeight = 2 * self.f * np.tan(fovRadians)
         cameraWidth = (self.width/self.height) * cameraHeight
-        orthoScale = np.array([ [2.0/cameraWidth, 0, 0, 0],
-                                [0, 2.0/cameraHeight, 0, 0],
-                                [0, 0, -2.0/(self.far - self.near), 0],
-                                [0, 0, 0, 1]], dtype = np.float32)
-
+        orthoScale = np.array([[2.0/cameraWidth, 0, 0, 0],
+                            [0, 2.0/cameraHeight, 0, 0],
+                            [0, 0, -2.0/(self.far - self.near), 0],
+                            [0, 0, 0, 1]], dtype=np.float32)
 
         projectionMatrix = orthoScale @ orthoTranslate
+
+        print(f"View Matrix:\n{viewMatrix}")
+        print(f"Projection Matrix:\n{projectionMatrix}")
 
         viewMatrixLocation = glGetUniformLocation(shader.ID, "viewMatrix".encode('utf-8'))
         glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, viewMatrix)
@@ -119,7 +143,7 @@ class Object:
 
         self.vbo = VBO(self.properties['vertices'])
         self.ibo = IBO(self.properties['indices'])
-        self.vao = VAO(self.vbo, self.vbl)
+        self.vao = VAO(self.vbo)
 
         self.properties.pop('vertices')
         self.properties.pop('indices')
@@ -127,7 +151,7 @@ class Object:
         # Create shaders
         self.shader = shader
 
-    def Draw(self): # Suggestion: Can assosiate new class variable 'self.objType' to write different Draw logic for different types of objects
+    def Draw(self):
         position = self.properties['position']
         rotation = self.properties['rotation']
         scale = self.properties['scale']
@@ -161,7 +185,7 @@ class Object:
                                 [0,0,scale[2],0],
                                 [0,0,0,1]], dtype = np.float32)
         
-        rotationMatrix = rotation_z_matrix @ rotation_y_matrix @ rotation_x_matrix # Roll then pitch then yaw in order (right to left applied)
+        rotationMatrix = rotation_z_matrix @ rotation_y_matrix @ rotation_x_matrix
         self.modelMatrix = translation_matrix @ rotationMatrix @ scale_matrix
 
         # Bind the shader, set uniforms, bind vao (automatically binds vbo) and ibo
