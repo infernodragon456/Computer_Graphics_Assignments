@@ -163,6 +163,9 @@ class Game:
             imgui.set_cursor_pos_x((window_w - imgui.calc_text_size("Press 1: New Game")[0]) / 2)
             imgui.text("Press 1: New Game")
 
+            imgui.set_cursor_pos_x((window_w - imgui.calc_text_size("Press 2: Exit")[0]) / 2)
+            imgui.text("Press 2: Exit")
+
             imgui.end()
             imgui.render()
             self.gui.render(imgui.get_draw_data())
@@ -172,7 +175,12 @@ class Game:
             if inputs["1"]:
                 self.screen = 1
                 self.InitScene()
+            if inputs["2"]:
+                print("Exiting game...")
+                import sys
+                sys.exit(0)
         
+
         if self.screen == 1:  # Game screen
             # Update space stations orbits
             if "spaceStations" in self.gameState:

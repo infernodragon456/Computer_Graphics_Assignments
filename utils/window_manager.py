@@ -67,6 +67,7 @@ class Window:
         
         inputs = {
             "1":False,
+            "2":False,
             "W":False,
             "S":False,
             "A":False,
@@ -82,6 +83,8 @@ class Window:
         
         if glfw.get_key(self.window, glfw.KEY_1) == glfw.PRESS:
             inputs["1"] = True
+        if glfw.get_key(self.window, glfw.KEY_2) == glfw.PRESS:
+            inputs["2"] = True
         if glfw.get_key(self.window, glfw.KEY_W) == glfw.PRESS:
             inputs["W"] = True
         if glfw.get_key(self.window, glfw.KEY_A) == glfw.PRESS:
