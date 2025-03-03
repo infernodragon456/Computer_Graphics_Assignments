@@ -175,7 +175,7 @@ class Game:
             imgui.render()
             self.gui.render(imgui.get_draw_data())
 
-        # Add direction indicator to DrawText method
+        # Direction indicator in bottom right (with rotating arrow)
         if self.screen == 1 and self.gameState["destination"]:
             # Draw direction indicator in bottom right
             indicator_size = 80
@@ -188,30 +188,50 @@ class Game:
             imgui.set_next_window_size(indicator_size, indicator_size)
             imgui.begin("Direction", False, imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)
             
-            # Calculate direction text based on angle
-            angle_degrees = np.degrees(self.gameState["direction_angle"]) % 360
+            # Get the drawing list for custom rendering
+            draw_list = imgui.get_window_draw_list()
             
-            # Determine cardinal direction
-            if 22.5 <= angle_degrees < 67.5:
-                direction_text = "NE →"
-            elif 67.5 <= angle_degrees < 112.5:
-                direction_text = "N ↑"
-            elif 112.5 <= angle_degrees < 157.5:
-                direction_text = "NW ←"
-            elif 157.5 <= angle_degrees < 202.5:
-                direction_text = "W ←"
-            elif 202.5 <= angle_degrees < 247.5:
-                direction_text = "SW ←"
-            elif 247.5 <= angle_degrees < 292.5:
-                direction_text = "S ↓"
-            elif 292.5 <= angle_degrees < 337.5:
-                direction_text = "SE →"
-            else:  # 337.5-360 or 0-22.5
-                direction_text = "E →"
+            # Calculate center of window
+            center_x = x_pos + indicator_size / 2
+            center_y = y_pos + indicator_size / 2
             
-            # Display direction text
-            imgui.text(f"Target")
-            imgui.text(direction_text)
+            # Arrow properties
+            arrow_color = imgui.get_color_u32_rgba(1, 0, 0, 1)  # Red
+            arrow_size = indicator_size * 0.4  # Size of arrow
+            
+            # Get direction angle
+            angle = self.gameState["direction_angle"]
+            
+            # Calculate arrow points based on angle
+            # Arrow tip
+            tip_x = center_x + np.cos(angle) * arrow_size
+            tip_y = center_y + np.sin(angle) * arrow_size
+            
+            # Arrow base points (making a triangle)
+            base_angle1 = angle + 2.5  # Angle for first base point
+            base_angle2 = angle - 2.5  # Angle for second base point
+            base_dist = arrow_size * 0.5
+            
+            base1_x = center_x + np.cos(base_angle1) * base_dist
+            base1_y = center_y + np.sin(base_angle1) * base_dist
+            base2_x = center_x + np.cos(base_angle2) * base_dist
+            base2_y = center_y + np.sin(base_angle2) * base_dist
+            
+            # Draw arrow as a filled triangle
+            draw_list.add_triangle_filled(
+                tip_x, tip_y,
+                base1_x, base1_y,
+                base2_x, base2_y,
+                arrow_color
+            )
+            
+            # Draw a circle in the background
+            draw_list.add_circle(
+                center_x, center_y,
+                indicator_size / 2 - 5,
+                imgui.get_color_u32_rgba(0.1, 0.1, 0.1, 0.7),  # Dark background
+                12  # Number of segments
+            )
             
             # Display distance
             if self.gameState["transporter"] and self.gameState["destination"]:
@@ -260,7 +280,7 @@ class Game:
                 transporter = self.gameState["transporter"]
                 
                 # Rotation speeds (in radians per frame)
-                rotation_speed = 0.005 * time['deltaTime'] * 60  # Scale by deltaTime, assuming 60fps baseline
+                rotation_speed = 0.008 * time['deltaTime'] * 60  # Scale by deltaTime, assuming 60fps baseline
                 
                 # Calculate current nose direction before rotation
                 forward = np.array([1, 0, 0], dtype=np.float32)  # Base forward vector along X-axis
@@ -447,8 +467,9 @@ class Game:
                 direction = dest_pos - player_pos
                 direction[2] = 0  # Ignore Z component for 2D direction
                 
-                # Calculate angle in XY plane
-                self.gameState["direction_angle"] = np.arctan2(direction[1], direction[0])
+                # Calculate angle in XY plane - FIXED: flip the angle calculation
+                # The issue is that the screen coordinates are flipped compared to world coordinates
+                self.gameState["direction_angle"] = np.arctan2(-direction[1], -direction[0])
                 
                 # Check if player has reached destination
                 distance_to_destination = np.linalg.norm(direction)
@@ -492,15 +513,35 @@ class Game:
             # Display win message if game is won
             if self.gameState["game_won"]:
                 # Position text in center of screen
-                x_pos = self.width / 2 - 100
-                y_pos = self.height / 2
+                x_pos = self.width / 2 - 150
+                y_pos = self.height / 2 - 75
                 
                 imgui.new_frame()
                 imgui.set_next_window_position(x_pos, y_pos)
-                imgui.set_next_window_size(200, 100)
+                imgui.set_next_window_size(300, 150)
                 imgui.begin("Win Message", False, imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)
+                
+                # Centered title
+                text_width = imgui.calc_text_size("MISSION ACCOMPLISHED!")[0]
+                imgui.set_cursor_pos_x((300 - text_width) / 2)
                 imgui.text("MISSION ACCOMPLISHED!")
+                
+                # Centered subtitle
+                text_width = imgui.calc_text_size("You've reached the destination!")[0]
+                imgui.set_cursor_pos_x((300 - text_width) / 2)
                 imgui.text("You've reached the destination!")
+                
+                # Add some space
+                imgui.dummy(0, 20)
+                
+                # Centered button
+                button_width = 200
+                imgui.set_cursor_pos_x((300 - button_width) / 2)
+                if imgui.button("Return to Main Menu", button_width, 30):
+                    # Return to main menu when clickeda
+                    self.screen = 0
+                    self.gameState["game_won"] = False
+                
                 imgui.end()
                 imgui.render()
                 self.gui.render(imgui.get_draw_data())
