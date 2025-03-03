@@ -28,7 +28,7 @@ class Window:
 
         if not self.window:
             glfw.terminate()
-            print("Glfw window can't be created")
+            #print("Glfw window can't be created")
             exit()
 
         # Set initial position on the screen and activate it
@@ -68,6 +68,7 @@ class Window:
         inputs = {
             "1":False,
             "2":False,
+            "4": False,
             "W":False,
             "S":False,
             "A":False,
@@ -85,6 +86,8 @@ class Window:
             inputs["1"] = True
         if glfw.get_key(self.window, glfw.KEY_2) == glfw.PRESS:
             inputs["2"] = True
+        if glfw.get_key(self.window, glfw.KEY_4) == glfw.PRESS:
+            inputs["4"] = True
         if glfw.get_key(self.window, glfw.KEY_W) == glfw.PRESS:
             inputs["W"] = True
         if glfw.get_key(self.window, glfw.KEY_A) == glfw.PRESS:

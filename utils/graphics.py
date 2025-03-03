@@ -61,10 +61,10 @@ class Camera:
         self.f = 1.0
 
     def Update(self, shader):
-        #print("Camera Update:")
-        #print(f"Position: {self.position}")
-        #print(f"LookAt: {self.lookAt}")
-        #print(f"Up: {self.up}")
+        ##print("Camera Update:")
+        ##print(f"Position: {self.position}")
+        ##print(f"LookAt: {self.lookAt}")
+        ##print(f"Up: {self.up}")
 
         shader.Use()
 
@@ -79,28 +79,28 @@ class Camera:
         look_norm = np.linalg.norm(look_dir)
         if look_norm < 1e-10:  # Check if vector is too small
             n = np.array([0, 1, 0], dtype=np.float32)  # Default forward direction
-            #print("Warning: lookAt - position is zero, using default direction")
+            ##print("Warning: lookAt - position is zero, using default direction")
         else:
             n = -look_dir / look_norm
         
-        ##print(f"Look direction (n): {n}")
+        ###print(f"Look direction (n): {n}")
         
         # Calculate right vector
         u = np.cross(self.up, n)
         u_norm = np.linalg.norm(u)
         if u_norm < 1e-10:
             u = np.array([1, 0, 0], dtype=np.float32)  # Default right direction
-            ##print("Warning: up × n is zero, using default right vector")
+            ###print("Warning: up × n is zero, using default right vector")
         else:
             u = u / u_norm
         
-        ##print(f"Right vector (u): {u}")
+        ###print(f"Right vector (u): {u}")
 
         # Calculate up vector
         v = np.cross(n, u)
         v = v / np.linalg.norm(v)
         
-        ##print(f"Up vector (v): {v}")
+        ###print(f"Up vector (v): {v}")
 
         viewRotate = np.array([[u[0], u[1], u[2], 0],
                             [v[0], v[1], v[2], 0],
@@ -125,8 +125,8 @@ class Camera:
 
         projectionMatrix = orthoScale @ orthoTranslate
 
-        ##print(f"View Matrix:\n{viewMatrix}")
-        ##print(f"Projection Matrix:\n{projectionMatrix}")
+        ###print(f"View Matrix:\n{viewMatrix}")
+        ###print(f"Projection Matrix:\n{projectionMatrix}")
 
         viewMatrixLocation = glGetUniformLocation(shader.ID, "viewMatrix".encode('utf-8'))
         glUniformMatrix4fv(viewMatrixLocation, 1, GL_TRUE, viewMatrix)

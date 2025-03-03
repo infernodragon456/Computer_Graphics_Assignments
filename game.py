@@ -26,20 +26,20 @@ class Game:
 
     def InitScene(self):
         if self.screen == 1:
-            print("\nInitializing Scene:")
+            #print("\nInitializing Scene:")
             
             # Initialize shaders
             self.shaders = {
                 'standard': Shader(standard_shader["vertex_shader"], standard_shader["fragment_shader"]),
                 'ui': Shader(ui_shader["vertex_shader"], ui_shader["fragment_shader"])
             }
-            print("Shaders initialized")
+            #print("Shaders initialized")
             
             # Initialize camera with proper lookAt vector
             self.camera = Camera(self.height, self.width)
             self.camera.position = np.array([-20, 0, 10], dtype=np.float32)
             self.camera.lookAt = np.array([0, 0, 0], dtype=np.float32)  # Look at origin
-            print(f"Camera initialized at position {self.camera.position}, looking at {self.camera.lookAt}")
+            #print(f"Camera initialized at position {self.camera.position}, looking at {self.camera.lookAt}")
             
             # Define world boundaries
             self.worldMin = np.array([-5000, -5000, -5000], dtype=np.float32)
@@ -47,12 +47,12 @@ class Game:
             
             # Set up light position
             self.lightPos = np.array([1000, 1000, 1000], dtype=np.float32)
-            print(f"Light position set to {self.lightPos}")
+            #print(f"Light position set to {self.lightPos}")
             
             # Initialize transporter
-            print("\nCreating objects:")
+            #print("\nCreating objects:")
             transporter_vertices, transporter_indices = create_transporter()
-            print(f"Transporter mesh created with {len(transporter_vertices)/6} vertices")
+            #print(f"Transporter mesh created with {len(transporter_vertices)/6} vertices")
             self.gameState["transporter"] = Object("transporter", self.shaders['standard'], {
                 'vertices': transporter_vertices,
                 'indices': transporter_indices,
@@ -63,7 +63,7 @@ class Game:
                 'velocity': np.array([0, 0, 0], dtype=np.float32),
                 'view': 1
             })
-            print("Transporter initialized")
+            #print("Transporter initialized")
 
             # Initialize planets and space stations
             self.n_planets = 5  # Reduced number for testing
@@ -128,7 +128,7 @@ class Game:
                 })
                 self.gameState["spacestations"].append(station)
             
-            print(f"Created {self.n_planets} planets with space stations")
+            #print(f"Created {self.n_planets} planets with space stations")
 
             # Initialize crosshair
             crosshair_vertices, crosshair_indices = create_crosshair()
@@ -147,11 +147,11 @@ class Game:
                 # Make the destination station a different color (green)
                 self.gameState["destination"].properties["colour"] = np.array([0.0, 1.0, 0.0, 1.0], dtype=np.float32)
 
-            print("\nScene initialization complete")
+            #print("\nScene initialization complete")
 
     def ProcessFrame(self, inputs, time):
         self.UpdateScene(inputs, time)
-        self.DrawScene()
+        self.DrawScene(inputs)
         self.DrawText()
 
     def DrawText(self):
@@ -250,7 +250,7 @@ class Game:
                 self.screen = 1
                 self.InitScene()
             if inputs["2"]:
-                print("Exiting game...")
+                #print("Exiting game...")
                 import sys
                 sys.exit(0)
         
@@ -308,18 +308,17 @@ class Game:
                 ], dtype=np.float32)
                 
                 # Calculate current nose direction
-                nose_direction = roll_matrix @ pitch_matrix @ yaw_matrix @ forward
-                print(f"Current nose direction: {nose_direction}")
+                #print(f"Current nose direction: {nose_direction}")
                 
                 # Handle rotations
                 if inputs["W"]:  # Pitch up
-                    print("W pressed - Attempting to pitch up")
+                    #print("W pressed - Attempting to pitch up")
                     transporter.properties["rotation"][1] -= rotation_speed  # Use Y-axis for pitch, inverted
-                    print(f"New rotation: {transporter.properties['rotation']}")
+                    #print(f"New rotation: {transporter.properties['rotation']}")
                 if inputs["S"]:  # Pitch down
-                    print("S pressed - Attempting to pitch down")
+                    #print("S pressed - Attempting to pitch down")
                     transporter.properties["rotation"][1] += rotation_speed  # Use Y-axis for pitch, inverted
-                    print(f"New rotation: {transporter.properties['rotation']}")
+                    #print(f"New rotation: {transporter.properties['rotation']}")
                 if inputs["A"]:  # Yaw left
                     transporter.properties["rotation"][2] += rotation_speed  # Use Z-axis for yaw
                 if inputs["D"]:  # Yaw right
@@ -352,8 +351,7 @@ class Game:
                     [0, 0, 1]
                 ], dtype=np.float32)
                 
-                new_nose_direction = roll_matrix @ pitch_matrix @ yaw_matrix @ forward
-                print(f"New nose direction: {new_nose_direction}")
+                #print(f"New nose direction: {new_nose_direction}")
 
                 # Handle forward movement (only on SPACE)
                 if inputs["SPACE"]:
@@ -390,8 +388,8 @@ class Game:
                     forward = roll_matrix @ pitch_matrix @ yaw_matrix @ forward
                     
                     # Update velocity (with speed limit)
-                    movement_speed = 1.0 * time['deltaTime'] * 60  # Scale by deltaTime, assuming 60fps baseline
-                    max_speed = 2.0
+                    movement_speed = 0.1 * time['deltaTime'] * 60  # Scale by deltaTime, assuming 60fps baseline
+                    max_speed = 0.5
                     
                     new_velocity = transporter.properties["velocity"] + forward * movement_speed
                     speed = np.linalg.norm(new_velocity)
@@ -473,11 +471,11 @@ class Game:
                 
                 # Check if player has reached destination
                 distance_to_destination = np.linalg.norm(direction)
-                if distance_to_destination < 10 and not self.gameState["game_won"]:  # Within 10 units
+                if distance_to_destination < 5 and not self.gameState["game_won"]:  # Within 10 units
                     self.gameState["game_won"] = True
-                    print("\n*** CONGRATULATIONS! You've reached the destination! ***\n")
+                    #print("\n*** CONGRATULATIONS! You've reached the destination! ***\n")
 
-    def DrawScene(self):
+    def DrawScene(self, inputs):
         if self.screen == 1:
             # Update camera for standard shader
             self.camera.Update(self.shaders['standard'])
@@ -488,7 +486,8 @@ class Game:
             viewPosLoc = glGetUniformLocation(self.shaders['standard'].ID, "viewPos".encode('utf-8'))
             
             if lightPosLoc == -1 or viewPosLoc == -1:
-                print("Warning: Could not find light/view position uniforms in shader")
+                #print("Warning: Could not find light/view position uniforms in shader")
+                pass
             
             glUniform3f(lightPosLoc, self.lightPos[0], self.lightPos[1], self.lightPos[2])
             glUniform3f(viewPosLoc, self.camera.position[0], self.camera.position[1], self.camera.position[2])
@@ -537,10 +536,13 @@ class Game:
                 # Centered button
                 button_width = 200
                 imgui.set_cursor_pos_x((300 - button_width) / 2)
-                if imgui.button("Return to Main Menu", button_width, 30):
+                imgui.button("Press 4: Return to Main Menu", button_width, 30)
                     # Return to main menu when clickeda
-                    self.screen = 0
-                    self.gameState["game_won"] = False
+                if inputs['4']:
+                        self.screen = 0
+                        print('entered')
+                        self.gameState["game_won"] = False
+                        
                 
                 imgui.end()
                 imgui.render()
