@@ -6,6 +6,8 @@ class App:
     def __init__(self):
         self.window = Window()
         self.game = Game(self.window.windowHeight, self.window.windowWidth, self.window.impl)
+        # Pass window reference to the game for mouse capture
+        self.game.SetWindow(self.window)
 
     def RenderLoop(self):
 

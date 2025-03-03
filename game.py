@@ -21,8 +21,15 @@ class Game:
             "crosshair": None,
             "destination": None,  # Will store the destination space station
             "game_won": False,    # Flag to track if player has reached destination
-            "direction_angle": 0  # Angle for the direction indicator
+            "direction_angle": 0,  # Angle for the direction indicator
+            "first_person_mode": False,  # New flag for first-person mode
+            "fp_pitch": 0,               # First-person view pitch
+            "fp_yaw": 0                  # First-person view yaw
         }
+        
+        # Store reference to window for mouse capture
+        # Will be set by the App class
+        self.window = None
 
     def InitScene(self):
         if self.screen == 1:
@@ -150,6 +157,14 @@ class Game:
             #print("\nScene initialization complete")
 
     def ProcessFrame(self, inputs, time):
+        # Add debug code to print input keys when in first-person mode
+        if "screen" in self.__dict__ and self.screen == 1 and "gameState" in self.__dict__ and "first_person_mode" in self.gameState and self.gameState["first_person_mode"]:
+            print(f"Available inputs: {list(inputs.keys())}")  # Print available input keys
+            if "mouse_dx" in inputs:
+                print(f"Mouse DX: {inputs['mouse_dx']}")
+            if "mouse_dy" in inputs:
+                print(f"Mouse DY: {inputs['mouse_dy']}")
+        
         self.UpdateScene(inputs, time)
         self.DrawScene(inputs)
         self.DrawText()
@@ -243,7 +258,7 @@ class Game:
             imgui.end()
             imgui.render()
             self.gui.render(imgui.get_draw_data())
-
+        
     def UpdateScene(self, inputs, time):
         if self.screen == 0:  # Start screen
             if inputs["1"]:
@@ -279,181 +294,242 @@ class Game:
             if "transporter" in self.gameState:
                 transporter = self.gameState["transporter"]
                 
-                # Rotation speeds (in radians per frame)
-                rotation_speed = 0.008 * time['deltaTime'] * 60  # Scale by deltaTime, assuming 60fps baseline
+                # Toggle first-person mode with L_SHIFT
+                if "L_SHIFT" in inputs and inputs["L_SHIFT"]:
+                    self.gameState["first_person_mode"] = not self.gameState["first_person_mode"]
+                    print(f"First-person mode: {self.gameState['first_person_mode']}")
+                    
+                    if self.gameState["first_person_mode"]:
+                        # Initialize first-person view angles based on current rotation
+                        self.gameState["fp_yaw"] = transporter.properties["rotation"][2]
+                        self.gameState["fp_pitch"] = transporter.properties["rotation"][1]
+                        
+                        # Enable mouse capture for first-person mode
+                        if self.window is not None:
+                            self.window.EnableMouseCapture()
+                        else:
+                            print("Warning: Window reference not set, mouse capture not enabled")
+                    else:
+                        # Disable mouse capture when exiting first-person mode
+                        if self.window is not None:
+                            self.window.DisableMouseCapture()
+                        else:
+                            print("Warning: Window reference not set, mouse capture not disabled")
                 
-                # Calculate current nose direction before rotation
-                forward = np.array([1, 0, 0], dtype=np.float32)  # Base forward vector along X-axis
-                yaw = transporter.properties["rotation"][1]
-                pitch = transporter.properties["rotation"][0]
-                roll = transporter.properties["rotation"][2]
-                
-                # Create rotation matrices
-                yaw_matrix = np.array([
-                    [np.cos(yaw), 0, np.sin(yaw)],
-                    [0, 1, 0],
-                    [-np.sin(yaw), 0, np.cos(yaw)]
-                ], dtype=np.float32)
-                
-                pitch_matrix = np.array([
-                    [1, 0, 0],
-                    [0, np.cos(pitch), -np.sin(pitch)],
-                    [0, np.sin(pitch), np.cos(pitch)]
-                ], dtype=np.float32)
-                
-                roll_matrix = np.array([
-                    [np.cos(roll), -np.sin(roll), 0],
-                    [np.sin(roll), np.cos(roll), 0],
-                    [0, 0, 1]
-                ], dtype=np.float32)
-                
-                # Calculate current nose direction
-                #print(f"Current nose direction: {nose_direction}")
-                
-                # Handle rotations
-                if inputs["W"]:  # Pitch up
-                    #print("W pressed - Attempting to pitch up")
-                    transporter.properties["rotation"][1] -= rotation_speed  # Use Y-axis for pitch, inverted
-                    #print(f"New rotation: {transporter.properties['rotation']}")
-                if inputs["S"]:  # Pitch down
-                    #print("S pressed - Attempting to pitch down")
-                    transporter.properties["rotation"][1] += rotation_speed  # Use Y-axis for pitch, inverted
-                    #print(f"New rotation: {transporter.properties['rotation']}")
-                if inputs["A"]:  # Yaw left
-                    transporter.properties["rotation"][2] += rotation_speed  # Use Z-axis for yaw
-                if inputs["D"]:  # Yaw right
-                    transporter.properties["rotation"][2] -= rotation_speed  # Use Z-axis for yaw
-                if inputs["Q"]:  # Roll clockwise
-                    transporter.properties["rotation"][0] -= rotation_speed  # Use X-axis for roll, inverted
-                if inputs["E"]:  # Roll counterclockwise
-                    transporter.properties["rotation"][0] += rotation_speed  # Use X-axis for roll, inverted
-
-                # Calculate new nose direction after rotation
-                yaw = transporter.properties["rotation"][1]
-                pitch = transporter.properties["rotation"][0]
-                roll = transporter.properties["rotation"][2]
-                
-                yaw_matrix = np.array([
-                    [np.cos(yaw), 0, np.sin(yaw)],
-                    [0, 1, 0],
-                    [-np.sin(yaw), 0, np.cos(yaw)]
-                ], dtype=np.float32)
-                
-                pitch_matrix = np.array([
-                    [1, 0, 0],
-                    [0, np.cos(pitch), -np.sin(pitch)],
-                    [0, np.sin(pitch), np.cos(pitch)]
-                ], dtype=np.float32)
-                
-                roll_matrix = np.array([
-                    [np.cos(roll), -np.sin(roll), 0],
-                    [np.sin(roll), np.cos(roll), 0],
-                    [0, 0, 1]
-                ], dtype=np.float32)
-                
-                #print(f"New nose direction: {new_nose_direction}")
-
-                # Handle forward movement (only on SPACE)
-                if inputs["SPACE"]:
-                    # Calculate forward direction based on current rotation
-                    forward = np.array([1, 0, 0], dtype=np.float32)  # Base forward vector (pointing along X)
+                # Handle ship controls only when not in first-person mode
+                if not self.gameState["first_person_mode"]:
+                    # Extract deltaTime
+                    delta_time = time['deltaTime']
+                    
+                    # Rotation speeds (in radians per frame)
+                    rotation_speed = 0.008 * delta_time * 60  # Scale by deltaTime, assuming 60fps baseline
+                    
+                    # Calculate current nose direction before rotation
+                    forward = np.array([1, 0, 0], dtype=np.float32)  # Base forward vector along X-axis
+                    yaw = transporter.properties["rotation"][1]
+                    pitch = transporter.properties["rotation"][0]
+                    roll = transporter.properties["rotation"][2]
                     
                     # Create rotation matrices
-                    # Yaw (Z-axis rotation)
-                    yaw = transporter.properties["rotation"][2]
                     yaw_matrix = np.array([
-                        [np.cos(yaw), -np.sin(yaw), 0],
-                        [np.sin(yaw), np.cos(yaw), 0],
+                        [np.cos(yaw), 0, np.sin(yaw)],
+                        [0, 1, 0],
+                        [-np.sin(yaw), 0, np.cos(yaw)]
+                    ], dtype=np.float32)
+                    
+                    pitch_matrix = np.array([
+                        [1, 0, 0],
+                        [0, np.cos(pitch), -np.sin(pitch)],
+                        [0, np.sin(pitch), np.cos(pitch)]
+                    ], dtype=np.float32)
+                    
+                    roll_matrix = np.array([
+                        [np.cos(roll), -np.sin(roll), 0],
+                        [np.sin(roll), np.cos(roll), 0],
                         [0, 0, 1]
                     ], dtype=np.float32)
                     
-                    # Pitch (Y-axis rotation)
-                    pitch = transporter.properties["rotation"][1]
-                    pitch_matrix = np.array([
-                        [np.cos(pitch), 0, np.sin(pitch)],
-                        [0, 1, 0],
-                        [-np.sin(pitch), 0, np.cos(pitch)]
-                    ], dtype=np.float32)
-                    
-                    # Roll (X-axis rotation)
-                    roll = transporter.properties["rotation"][0]
-                    roll_matrix = np.array([
-                        [1, 0, 0],
-                        [0, np.cos(roll), -np.sin(roll)],
-                        [0, np.sin(roll), np.cos(roll)]
-                    ], dtype=np.float32)
-                    
-                    # Apply rotations to get forward direction
-                    # Apply in the same order as for calculating nose direction
-                    forward = roll_matrix @ pitch_matrix @ yaw_matrix @ forward
-                    
-                    # Update velocity (with speed limit)
-                    movement_speed = 0.1 * time['deltaTime'] * 60  # Scale by deltaTime, assuming 60fps baseline
-                    max_speed = 0.5
-                    
-                    new_velocity = transporter.properties["velocity"] + forward * movement_speed
-                    speed = np.linalg.norm(new_velocity)
-                    if speed > max_speed:
-                        new_velocity = (new_velocity / speed) * max_speed
-                    
-                    transporter.properties["velocity"] = new_velocity
-                
-                # Apply velocity to position
-                transporter.properties["position"] += transporter.properties["velocity"]
-                
-                # Add drag to slow down when not accelerating
-                drag = 0.99
-                transporter.properties["velocity"] *= drag
+                    # Handle rotations
+                    if inputs["W"]:  # Pitch up
+                        transporter.properties["rotation"][1] -= rotation_speed  # Use Y-axis for pitch, inverted
+                    if inputs["S"]:  # Pitch down
+                        transporter.properties["rotation"][1] += rotation_speed  # Use Y-axis for pitch, inverted
+                    if inputs["A"]:  # Yaw left
+                        transporter.properties["rotation"][2] += rotation_speed  # Use Z-axis for yaw
+                    if inputs["D"]:  # Yaw right
+                        transporter.properties["rotation"][2] -= rotation_speed  # Use Z-axis for yaw
+                    if inputs["Q"]:  # Roll clockwise
+                        transporter.properties["rotation"][0] -= rotation_speed  # Use X-axis for roll, inverted
+                    if inputs["E"]:  # Roll counterclockwise
+                        transporter.properties["rotation"][0] += rotation_speed  # Use X-axis for roll, inverted
 
-                # Update camera to follow transporter
-                camera_distance = 10
-                camera_height = 0
+                    # Calculate new nose direction after rotation
+                    yaw = transporter.properties["rotation"][1]
+                    pitch = transporter.properties["rotation"][0]
+                    roll = transporter.properties["rotation"][2]
+                    
+                    yaw_matrix = np.array([
+                        [np.cos(yaw), 0, np.sin(yaw)],
+                        [0, 1, 0],
+                        [-np.sin(yaw), 0, np.cos(yaw)]
+                    ], dtype=np.float32)
+                    
+                    pitch_matrix = np.array([
+                        [1, 0, 0],
+                        [0, np.cos(pitch), -np.sin(pitch)],
+                        [0, np.sin(pitch), np.cos(pitch)]
+                    ], dtype=np.float32)
+                    
+                    roll_matrix = np.array([
+                        [np.cos(roll), -np.sin(roll), 0],
+                        [np.sin(roll), np.cos(roll), 0],
+                        [0, 0, 1]
+                    ], dtype=np.float32)
+                    
+                    # Handle forward movement (only on SPACE)
+                    if inputs["SPACE"]:
+                        # Calculate forward direction based on current rotation
+                        forward = np.array([1, 0, 0], dtype=np.float32)  # Base forward vector (pointing along X)
+                        
+                        # Create rotation matrices
+                        # Yaw (Z-axis rotation)
+                        yaw = transporter.properties["rotation"][2]
+                        yaw_matrix = np.array([
+                            [np.cos(yaw), -np.sin(yaw), 0],
+                            [np.sin(yaw), np.cos(yaw), 0],
+                            [0, 0, 1]
+                        ], dtype=np.float32)
+                        
+                        # Pitch (Y-axis rotation)
+                        pitch = transporter.properties["rotation"][1]
+                        pitch_matrix = np.array([
+                            [np.cos(pitch), 0, np.sin(pitch)],
+                            [0, 1, 0],
+                            [-np.sin(pitch), 0, np.cos(pitch)]
+                        ], dtype=np.float32)
+                        
+                        # Roll (X-axis rotation)
+                        roll = transporter.properties["rotation"][0]
+                        roll_matrix = np.array([
+                            [1, 0, 0],
+                            [0, np.cos(roll), -np.sin(roll)],
+                            [0, np.sin(roll), np.cos(roll)]
+                        ], dtype=np.float32)
+                        
+                        # Apply rotations to get forward direction
+                        # Apply in the same order as for calculating nose direction
+                        forward = roll_matrix @ pitch_matrix @ yaw_matrix @ forward
+                        
+                        # Update velocity (with speed limit)
+                        movement_speed = 0.1 * delta_time * 60  # Scale by deltaTime, assuming 60fps baseline
+                        max_speed = 0.5
+                        
+                        new_velocity = transporter.properties["velocity"] + forward * movement_speed
+                        speed = np.linalg.norm(new_velocity)
+                        if speed > max_speed:
+                            new_velocity = (new_velocity / speed) * max_speed
+                        
+                        transporter.properties["velocity"] = new_velocity
+                    
+                    # Apply velocity to position
+                    transporter.properties["position"] += transporter.properties["velocity"]
+                    
+                    # Add drag to slow down when not accelerating
+                    drag = 0.99
+                    transporter.properties["velocity"] *= drag
+
+                # First-person camera control with mouse when in first-person mode
+                if self.gameState["first_person_mode"]:
+                    # Get mouse delta from the inputs - this is the correct key based on the window_manager.py file
+                    if "mouseDelta" in inputs:
+                        mouse_dx = inputs["mouseDelta"][0]  # X-axis mouse movement
+                        mouse_dy = inputs["mouseDelta"][1]  # Y-axis mouse movement
+                        
+                        # Mouse sensitivity factor - adjusted for potentially larger values
+                        mouse_sensitivity = 0.002
+                        
+                        # Update yaw and pitch based on mouse movement
+                        self.gameState["fp_yaw"] -= mouse_dx * mouse_sensitivity
+                        self.gameState["fp_pitch"] -= mouse_dy * mouse_sensitivity
+                        
+                        # Clamp pitch to prevent over-rotation
+                        self.gameState["fp_pitch"] = max(min(self.gameState["fp_pitch"], np.pi/2 - 0.1), -np.pi/2 + 0.1)
+                        
+                        if mouse_dx != 0 or mouse_dy != 0:
+                            print(f"Mouse movement: DX={mouse_dx}, DY={mouse_dy}")
+                            print(f"Updated camera: Yaw={self.gameState['fp_yaw']}, Pitch={self.gameState['fp_pitch']}")
                 
-                # Third-person camera implementation
-                # First position the camera behind and above the ship
-                camera_pos = np.copy(transporter.properties["position"])
-                
-                # Apply transformations in the correct order
-                # 1. Move back by camera_distance (along negative X since ship faces positive X)
-                camera_pos[0] -= camera_distance
-                
-                # 2. Move up by camera_height
-                camera_pos[2] += camera_height
-                
-                # 3. Rotate around the ship based on ship's rotation
-                # Get ship's rotation angles
-                yaw = transporter.properties["rotation"][2]  # Z-axis rotation
-                pitch = transporter.properties["rotation"][1]  # Y-axis rotation
-                
-                # Calculate rotation around the ship
-                # Create a vector from ship to camera
-                camera_vector = camera_pos - transporter.properties["position"]
-                
-                # Apply yaw rotation (around Z-axis)
-                yaw_rad = yaw
-                cos_yaw = np.cos(yaw_rad)
-                sin_yaw = np.sin(yaw_rad)
-                
-                new_x = camera_vector[0] * cos_yaw - camera_vector[1] * sin_yaw
-                new_y = camera_vector[0] * sin_yaw + camera_vector[1] * cos_yaw
-                
-                camera_vector[0] = new_x
-                camera_vector[1] = new_y
-                
-                # Apply pitch rotation (around Y-axis)
-                pitch_rad = pitch
-                cos_pitch = np.cos(pitch_rad)
-                sin_pitch = np.sin(pitch_rad)
-                
-                new_x = camera_vector[0] * cos_pitch + camera_vector[2] * sin_pitch
-                new_z = -camera_vector[0] * sin_pitch + camera_vector[2] * cos_pitch
-                
-                camera_vector[0] = new_x
-                camera_vector[2] = new_z
-                
-                # Set final camera position
-                self.camera.position = transporter.properties["position"] + camera_vector
-                self.camera.lookAt = transporter.properties["position"]
+                # Update camera based on mode
+                if self.camera:
+                    if self.gameState["first_person_mode"]:
+                        # First-person camera implementation
+                        # Position camera above the transporter (on top of the ship)
+                        ship_position = np.copy(transporter.properties["position"])
+                        # Add height offset to place camera on top of the ship
+                        ship_position[2] += 2.0  # Adjust this value based on ship size
+                        self.camera.position = ship_position
+                        
+                        # Calculate lookAt direction based on first-person yaw and pitch
+                        direction = np.array([
+                            np.cos(self.gameState["fp_yaw"]) * np.cos(self.gameState["fp_pitch"]),
+                            np.sin(self.gameState["fp_yaw"]) * np.cos(self.gameState["fp_pitch"]),
+                            np.sin(self.gameState["fp_pitch"])
+                        ], dtype=np.float32)
+                        
+                        # Set lookAt point
+                        self.camera.lookAt = self.camera.position + direction * 10
+                    else:
+                        # Third-person camera implementation
+                        camera_distance = 10
+                        camera_height = 0
+                        
+                        # First position the camera behind and above the ship
+                        camera_pos = np.copy(transporter.properties["position"])
+                        
+                        # Apply transformations in the correct order
+                        # 1. Move back by camera_distance (along negative X since ship faces positive X)
+                        camera_pos[0] -= camera_distance
+                        
+                        # 2. Move up by camera_height
+                        camera_pos[2] += camera_height
+                        
+                        # 3. Rotate around the ship based on ship's rotation
+                        # Get ship's rotation angles
+                        yaw = transporter.properties["rotation"][2]  # Z-axis rotation
+                        pitch = transporter.properties["rotation"][1]  # Y-axis rotation
+                        
+                        # Calculate rotation around the ship
+                        # Create a vector from ship to camera
+                        camera_vector = camera_pos - transporter.properties["position"]
+                        
+                        # Apply yaw rotation (around Z-axis)
+                        yaw_rad = yaw
+                        cos_yaw = np.cos(yaw_rad)
+                        sin_yaw = np.sin(yaw_rad)
+                        
+                        new_x = camera_vector[0] * cos_yaw - camera_vector[1] * sin_yaw
+                        new_y = camera_vector[0] * sin_yaw + camera_vector[1] * cos_yaw
+                        
+                        camera_vector[0] = new_x
+                        camera_vector[1] = new_y
+                        
+                        # Apply pitch rotation (around Y-axis)
+                        pitch_rad = pitch
+                        cos_pitch = np.cos(pitch_rad)
+                        sin_pitch = np.sin(pitch_rad)
+                        
+                        new_x = camera_vector[0] * cos_pitch + camera_vector[2] * sin_pitch
+                        new_z = -camera_vector[0] * sin_pitch + camera_vector[2] * cos_pitch
+                        
+                        camera_vector[0] = new_x
+                        camera_vector[2] = new_z
+                        
+                        # Set final camera position
+                        self.camera.position = transporter.properties["position"] + camera_vector
+                        self.camera.lookAt = transporter.properties["position"]
+                    
+                    # Update the camera in both modes
+                    self.camera.Update(self.shaders['standard'])
 
             # Update direction angle for UI arrow
             if self.gameState["destination"] and self.gameState["transporter"]:
@@ -547,4 +623,9 @@ class Game:
                 imgui.end()
                 imgui.render()
                 self.gui.render(imgui.get_draw_data())
+
+    def SetWindow(self, window):
+        """Set the window reference for mouse capture"""
+        self.window = window
+        print("Window reference set for mouse capture")
 

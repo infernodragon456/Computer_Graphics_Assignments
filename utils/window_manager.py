@@ -120,8 +120,24 @@ class Window:
         return inputs, time
     
     def EndFrame(self):
-        # Can manually set the position of mouse to center of screen per frame
-        # glfw.set_cursor_pos(self.window, self.windowWidth/2, self.windowHeight/2) 
+        # Reset cursor position to center of screen for next frame
+        # This is essential for first-person camera control
+        glfw.set_cursor_pos(self.window, self.windowWidth/2, self.windowHeight/2) 
         
-        glfw.swap_buffers(self.window) 
+        glfw.swap_buffers(self.window)
+    
+    # New methods for mouse capture
+    def EnableMouseCapture(self):
+        """Enable mouse capture for first-person camera control"""
+        # Hide the cursor
+        glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_DISABLED)
+        # Center the cursor
+        glfw.set_cursor_pos(self.window, self.windowWidth/2, self.windowHeight/2)
+        print("Mouse capture enabled")
+    
+    def DisableMouseCapture(self):
+        """Disable mouse capture when exiting first-person mode"""
+        # Show the cursor again
+        glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+        print("Mouse capture disabled")
     

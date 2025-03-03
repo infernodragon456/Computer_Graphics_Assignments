@@ -15,6 +15,11 @@ Space Heist is a thrilling first-person space navigation game where you pilot a 
 - **Q/E**: Roll clockwise/counterclockwise
 - **SPACE**: Thrust forward in the direction the ship is facing
 
+### Camera Control
+
+- **LSHIFT**: Toggle between third-person and first-person view
+- **Mouse Movement**: When in first-person mode, look around in any direction
+
 ### Other Controls
 
 - **1**: Start a new game from the main menu
