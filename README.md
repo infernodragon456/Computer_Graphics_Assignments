@@ -49,6 +49,8 @@ Space Heist is a thrilling first-person space navigation game where you pilot a 
 - If a pirate ship collides with your vessel, it's destroyed but damages your health
 - Monitor your health bar in the top-left corner of the screen
 - Game ends if your health reaches zero
+- A game over screen appears when your health reaches zero
+- Press 4 from the game over screen to return to the main menu
 
 ### Camera
 
@@ -71,8 +73,9 @@ Space Heist is a thrilling first-person space navigation game where you pilot a 
 2. Locate the green space station (your destination)
 3. Navigate to the destination using the direction indicator
 4. Defend yourself against pirate ships along the way
-5. Successfully dock with the space station to complete the mission
-6. Return to the main menu to play again
+5. Maintain your ship's health above zero to avoid mission failure
+6. Successfully dock with the space station to complete the mission
+7. Return to the main menu to play again
 
 ## Game Environment
 
@@ -104,7 +107,8 @@ Space Heist is a thrilling first-person space navigation game where you pilot a 
 - The direction indicator points to your destination in world-space, not relative to your ship's orientation
 - Switch to first-person mode for a more immersive experience and to shoot lasers
 - The crosshair helps aim your lasers in first-person mode
-- Monitor your health - if it reaches zero, your mission fails
+- Monitor your health - if it reaches zero, your mission fails and you'll see a game over screen
+- Balance between fighting pirates and reaching your destination for the most successful missions
 
 ## Development
 

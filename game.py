@@ -21,6 +21,7 @@ class Game:
             "crosshair": None,
             "destination": None,  # Will store the destination space station
             "game_won": False,    # Flag to track if player has reached destination
+            "game_over": False,   # Flag to track if player has been defeated
             "direction_angle": 0,  # Angle for the direction indicator
             "first_person_mode": False,  # New flag for first-person mode
             "fp_pitch": 0,               # First-person view pitch
@@ -150,7 +151,7 @@ class Game:
 
             # Initialize pirate ships
             pirate_vertices, pirate_indices = create_pirate()
-            self.n_pirates = 3  # Number of pirate ships
+            self.n_pirates = 5  # Number of pirate ships
             self.gameState["pirates"] = []
             
             for i in range(self.n_pirates):
@@ -396,7 +397,8 @@ class Game:
                         # Check if player is defeated
                         if self.gameState["player_health"] <= 0:
                             print("Player defeated!")
-                            # Implement game over logic here if needed
+                            self.gameState["game_over"] = True
+                            self.gameState["player_health"] = 0  # Ensure health doesn't go below 0
                     else:
                         # Normalize direction and move pirate towards player
                         if distance_to_player > 0:
@@ -806,6 +808,47 @@ class Game:
                         self.gameState["game_won"] = False
                         
                 
+                imgui.end()
+                imgui.render()
+                self.gui.render(imgui.get_draw_data())
+
+            # Display game over message if player is defeated
+            if self.gameState["game_over"]:
+                # Position text in center of screen
+                x_pos = self.width / 2 - 150
+                y_pos = self.height / 2 - 75
+                
+                imgui.new_frame()
+                imgui.set_next_window_position(x_pos, y_pos)
+                imgui.set_next_window_size(300, 150)
+                imgui.begin("Game Over", False, imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)
+                
+                # Centered title
+                text_width = imgui.calc_text_size("MISSION FAILED!")[0]
+                imgui.set_cursor_pos_x((300 - text_width) / 2)
+                imgui.text("MISSION FAILED!")
+                
+                # Centered subtitle
+                text_width = imgui.calc_text_size("Your ship has been destroyed!")[0]
+                imgui.set_cursor_pos_x((300 - text_width) / 2)
+                imgui.text("Your ship has been destroyed!")
+                
+                # Add some space
+                imgui.dummy(0, 20)
+                
+                # Centered button
+                button_width = 200
+                imgui.set_cursor_pos_x((300 - button_width) / 2)
+                imgui.button("Press 4: Return to Main Menu", button_width, 30)
+                # Return to main menu when pressed
+                if inputs['4']:
+                    self.screen = 0
+                    self.gameState["game_over"] = False
+                    self.gameState["player_health"] = 100  # Reset player health
+                    # Reset pirates and other game elements
+                    self.gameState["pirates"] = []
+                    self.gameState["lasers"] = []
+                    
                 imgui.end()
                 imgui.render()
                 self.gui.render(imgui.get_draw_data())
