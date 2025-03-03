@@ -12,7 +12,17 @@ class Game:
         self.height = height
         self.width = width
         self.screen = 0
-        self.gameState = {}
+        self.gameState = {
+            "transporter": None,
+            "pirates": [],
+            "planets": [],
+            "spacestations": [],
+            "lasers": [],
+            "crosshair": None,
+            "destination": None,  # Will store the destination space station
+            "game_won": False,    # Flag to track if player has reached destination
+            "direction_angle": 0  # Angle for the direction indicator
+        }
 
     def InitScene(self):
         if self.screen == 1:
@@ -58,7 +68,7 @@ class Game:
             # Initialize planets and space stations
             self.n_planets = 5  # Reduced number for testing
             self.gameState["planets"] = []
-            self.gameState["spaceStations"] = []
+            self.gameState["spacestations"] = []
             
             planet_vertices, planet_indices = create_planet()
             station_vertices, station_indices = create_space_station()
@@ -109,27 +119,16 @@ class Game:
                     'indices': station_indices,
                     'position': station_pos,
                     'rotation': np.array([0, station_angle, 0], dtype=np.float32),
-                    'scale': np.array([5, 5, 5], dtype=np.float32),
+                    'scale': np.array([2, 2, 2], dtype=np.float32),
                     'colour': np.array([0.8, 0.8, 0.8, 1.0], dtype=np.float32),
                     'orbit_center': position,
                     'orbit_radius': orbit_radius,
                     'orbit_angle': station_angle,
                     'orbit_speed': 0.001  # Radians per frame
                 })
-                self.gameState["spaceStations"].append(station)
+                self.gameState["spacestations"].append(station)
             
             print(f"Created {self.n_planets} planets with space stations")
-
-            # Initialize minimap arrow
-            arrow_vertices, arrow_indices = create_arrow()
-            self.gameState["arrow"] = Object("arrow", self.shaders['ui'], {
-                'vertices': arrow_vertices,
-                'indices': arrow_indices,
-                'position': np.array([0.8, -0.8, 0], dtype=np.float32),  # Bottom right corner
-                'rotation': np.array([0, 0, 0], dtype=np.float32),
-                'scale': np.array([0.1, 0.1, 0.1], dtype=np.float32),
-                'colour': np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)
-            })
 
             # Initialize crosshair
             crosshair_vertices, crosshair_indices = create_crosshair()
@@ -141,6 +140,12 @@ class Game:
                 'scale': np.array([1, 1, 1], dtype=np.float32),
                 'colour': np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)
             })
+
+            # Select a random space station as destination
+            if self.gameState["spacestations"]:
+                self.gameState["destination"] = np.random.choice(self.gameState["spacestations"])
+                # Make the destination station a different color (green)
+                self.gameState["destination"].properties["colour"] = np.array([0.0, 1.0, 0.0, 1.0], dtype=np.float32)
 
             print("\nScene initialization complete")
 
@@ -170,6 +175,55 @@ class Game:
             imgui.render()
             self.gui.render(imgui.get_draw_data())
 
+        # Add direction indicator to DrawText method
+        if self.screen == 1 and self.gameState["destination"]:
+            # Draw direction indicator in bottom right
+            indicator_size = 80
+            x_pos = self.width - indicator_size - 20  # 20px padding from right edge
+            y_pos = self.height - indicator_size - 20  # 20px padding from bottom edge
+            
+            # Create a new ImGui window for the indicator
+            imgui.new_frame()
+            imgui.set_next_window_position(x_pos, y_pos)
+            imgui.set_next_window_size(indicator_size, indicator_size)
+            imgui.begin("Direction", False, imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)
+            
+            # Calculate direction text based on angle
+            angle_degrees = np.degrees(self.gameState["direction_angle"]) % 360
+            
+            # Determine cardinal direction
+            if 22.5 <= angle_degrees < 67.5:
+                direction_text = "NE →"
+            elif 67.5 <= angle_degrees < 112.5:
+                direction_text = "N ↑"
+            elif 112.5 <= angle_degrees < 157.5:
+                direction_text = "NW ←"
+            elif 157.5 <= angle_degrees < 202.5:
+                direction_text = "W ←"
+            elif 202.5 <= angle_degrees < 247.5:
+                direction_text = "SW ←"
+            elif 247.5 <= angle_degrees < 292.5:
+                direction_text = "S ↓"
+            elif 292.5 <= angle_degrees < 337.5:
+                direction_text = "SE →"
+            else:  # 337.5-360 or 0-22.5
+                direction_text = "E →"
+            
+            # Display direction text
+            imgui.text(f"Target")
+            imgui.text(direction_text)
+            
+            # Display distance
+            if self.gameState["transporter"] and self.gameState["destination"]:
+                player_pos = self.gameState["transporter"].properties["position"]
+                dest_pos = self.gameState["destination"].properties["position"]
+                distance = np.linalg.norm(dest_pos - player_pos)
+                imgui.text(f"Dist: {distance:.0f}")
+            
+            imgui.end()
+            imgui.render()
+            self.gui.render(imgui.get_draw_data())
+
     def UpdateScene(self, inputs, time):
         if self.screen == 0:  # Start screen
             if inputs["1"]:
@@ -183,8 +237,8 @@ class Game:
 
         if self.screen == 1:  # Game screen
             # Update space stations orbits
-            if "spaceStations" in self.gameState:
-                for station in self.gameState["spaceStations"]:
+            if "spacestations" in self.gameState:
+                for station in self.gameState["spacestations"]:
                     # Update orbit angle
                     station.properties["orbit_angle"] += station.properties["orbit_speed"]
                     
@@ -202,40 +256,17 @@ class Game:
                     # Update rotation to face orbit direction
                     station.properties["rotation"][1] = angle
 
-            if "transporter" in self.gameState:
+            # Handle transporter controls with deltaTime
+            if "transporter" in self.gameState and self.gameState["transporter"]:
                 transporter = self.gameState["transporter"]
                 
-                # Rotation speeds (in radians per frame)
-                rotation_speed = 0.01
+                # Base speeds - units per second instead of per frame
+                base_rotation_speed = 1.0  # radians per second
+                base_movement_speed = 20.0  # units per second
                 
-                # Calculate current nose direction before rotation
-                forward = np.array([1, 0, 0], dtype=np.float32)  # Base forward vector along X-axis
-                yaw = transporter.properties["rotation"][1]
-                pitch = transporter.properties["rotation"][0]
-                roll = transporter.properties["rotation"][2]
-                
-                # Create rotation matrices
-                yaw_matrix = np.array([
-                    [np.cos(yaw), 0, np.sin(yaw)],
-                    [0, 1, 0],
-                    [-np.sin(yaw), 0, np.cos(yaw)]
-                ], dtype=np.float32)
-                
-                pitch_matrix = np.array([
-                    [1, 0, 0],
-                    [0, np.cos(pitch), -np.sin(pitch)],
-                    [0, np.sin(pitch), np.cos(pitch)]
-                ], dtype=np.float32)
-                
-                roll_matrix = np.array([
-                    [np.cos(roll), -np.sin(roll), 0],
-                    [np.sin(roll), np.cos(roll), 0],
-                    [0, 0, 1]
-                ], dtype=np.float32)
-                
-                # Calculate current nose direction
-                nose_direction = roll_matrix @ pitch_matrix @ yaw_matrix @ forward
-                print(f"Current nose direction: {nose_direction}")
+                # Apply deltaTime to get frame-independent speeds
+                rotation_speed = base_rotation_speed * time
+                movement_speed = base_movement_speed * time
                 
                 # Handle rotations
                 if inputs["W"]:  # Pitch up
@@ -254,134 +285,70 @@ class Game:
                     transporter.properties["rotation"][0] -= rotation_speed  # Use X-axis for roll, inverted
                 if inputs["E"]:  # Roll counterclockwise
                     transporter.properties["rotation"][0] += rotation_speed  # Use X-axis for roll, inverted
-
-                # Calculate new nose direction after rotation
-                yaw = transporter.properties["rotation"][1]
-                pitch = transporter.properties["rotation"][0]
-                roll = transporter.properties["rotation"][2]
                 
-                yaw_matrix = np.array([
-                    [np.cos(yaw), 0, np.sin(yaw)],
-                    [0, 1, 0],
-                    [-np.sin(yaw), 0, np.cos(yaw)]
-                ], dtype=np.float32)
-                
-                pitch_matrix = np.array([
-                    [1, 0, 0],
-                    [0, np.cos(pitch), -np.sin(pitch)],
-                    [0, np.sin(pitch), np.cos(pitch)]
-                ], dtype=np.float32)
-                
-                roll_matrix = np.array([
-                    [np.cos(roll), -np.sin(roll), 0],
-                    [np.sin(roll), np.cos(roll), 0],
-                    [0, 0, 1]
-                ], dtype=np.float32)
-                
-                new_nose_direction = roll_matrix @ pitch_matrix @ yaw_matrix @ forward
-                print(f"New nose direction: {new_nose_direction}")
-
-                # Handle forward movement (only on SPACE)
+                # Handle movement (when SPACE is pressed)
                 if inputs["SPACE"]:
                     # Calculate forward direction based on current rotation
-                    forward = np.array([1, 0, 0], dtype=np.float32)  # Base forward vector (pointing along X)
-                    
-                    # Create rotation matrices
-                    # Yaw (Z-axis rotation)
-                    yaw = transporter.properties["rotation"][2]
-                    yaw_matrix = np.array([
-                        [np.cos(yaw), -np.sin(yaw), 0],
-                        [np.sin(yaw), np.cos(yaw), 0],
-                        [0, 0, 1]
-                    ], dtype=np.float32)
-                    
-                    # Pitch (Y-axis rotation)
+                    # Note: We use only pitch and yaw for forward direction, ignoring roll
                     pitch = transporter.properties["rotation"][1]
-                    pitch_matrix = np.array([
-                        [np.cos(pitch), 0, np.sin(pitch)],
-                        [0, 1, 0],
-                        [-np.sin(pitch), 0, np.cos(pitch)]
+                    yaw = transporter.properties["rotation"][2]
+                    
+                    # Calculate forward vector (excluding roll)
+                    forward = np.array([
+                        -np.sin(yaw) * np.cos(pitch),
+                        np.cos(yaw) * np.cos(pitch),
+                        np.sin(pitch)
                     ], dtype=np.float32)
                     
-                    # Roll (X-axis rotation)
-                    roll = transporter.properties["rotation"][0]
-                    roll_matrix = np.array([
-                        [1, 0, 0],
-                        [0, np.cos(roll), -np.sin(roll)],
-                        [0, np.sin(roll), np.cos(roll)]
-                    ], dtype=np.float32)
-                    
-                    # Apply rotations to get forward direction
-                    # Apply in the same order as for calculating nose direction
-                    forward = roll_matrix @ pitch_matrix @ yaw_matrix @ forward
-                    
-                    # Update velocity (with speed limit)
-                    acceleration = 0.1
-                    max_speed = 2.0
-                    
-                    new_velocity = transporter.properties["velocity"] + forward * acceleration
-                    speed = np.linalg.norm(new_velocity)
-                    if speed > max_speed:
-                        new_velocity = (new_velocity / speed) * max_speed
-                    
-                    transporter.properties["velocity"] = new_velocity
+                    # Move in the forward direction
+                    transporter.properties["position"] += forward * movement_speed
                 
-                # Apply velocity to position
-                transporter.properties["position"] += transporter.properties["velocity"]
-                
-                # Add drag to slow down when not accelerating
-                drag = 0.99
-                transporter.properties["velocity"] *= drag
-
                 # Update camera to follow transporter
-                camera_distance = 10
-                camera_height = 0
+                if self.camera:
+                    # Get transporter's position and rotation
+                    trans_pos = transporter.properties["position"]
+                    pitch = transporter.properties["rotation"][1]
+                    yaw = transporter.properties["rotation"][2]
+                    
+                    # Calculate camera offset (behind and above the transporter)
+                    camera_distance = 30.0  # Distance from transporter
+                    camera_height = 5.0    # Height above transporter
+                    
+                    # Calculate camera position based on transporter's rotation (pitch and yaw only)
+                    camera_offset = np.array([
+                        np.sin(yaw) * np.cos(pitch),  # X offset
+                        -np.cos(yaw) * np.cos(pitch), # Y offset
+                        -np.sin(pitch)                # Z offset
+                    ], dtype=np.float32)
+                    
+                    # Position camera behind the transporter
+                    self.camera.position = trans_pos - camera_offset * camera_distance
+                    self.camera.position[2] += camera_height  # Add height
+                    
+                    # Look at the transporter
+                    self.camera.lookAt = trans_pos
+                    
+                    # Update the camera
+                    self.camera.Update(self.shaders['standard'])
+
+            # Update direction angle for UI arrow
+            if self.gameState["destination"] and self.gameState["transporter"]:
+                # Get positions
+                player_pos = self.gameState["transporter"].properties["position"]
+                dest_pos = self.gameState["destination"].properties["position"]
                 
-                # Third-person camera implementation
-                # First position the camera behind and above the ship
-                camera_pos = np.copy(transporter.properties["position"])
+                # Calculate direction vector from player to destination (in XY plane for compass)
+                direction = dest_pos - player_pos
+                direction[2] = 0  # Ignore Z component for 2D direction
                 
-                # Apply transformations in the correct order
-                # 1. Move back by camera_distance (along negative X since ship faces positive X)
-                camera_pos[0] -= camera_distance
+                # Calculate angle in XY plane
+                self.gameState["direction_angle"] = np.arctan2(direction[1], direction[0])
                 
-                # 2. Move up by camera_height
-                camera_pos[2] += camera_height
-                
-                # 3. Rotate around the ship based on ship's rotation
-                # Get ship's rotation angles
-                yaw = transporter.properties["rotation"][2]  # Z-axis rotation
-                pitch = transporter.properties["rotation"][1]  # Y-axis rotation
-                
-                # Calculate rotation around the ship
-                # Create a vector from ship to camera
-                camera_vector = camera_pos - transporter.properties["position"]
-                
-                # Apply yaw rotation (around Z-axis)
-                yaw_rad = yaw
-                cos_yaw = np.cos(yaw_rad)
-                sin_yaw = np.sin(yaw_rad)
-                
-                new_x = camera_vector[0] * cos_yaw - camera_vector[1] * sin_yaw
-                new_y = camera_vector[0] * sin_yaw + camera_vector[1] * cos_yaw
-                
-                camera_vector[0] = new_x
-                camera_vector[1] = new_y
-                
-                # Apply pitch rotation (around Y-axis)
-                pitch_rad = pitch
-                cos_pitch = np.cos(pitch_rad)
-                sin_pitch = np.sin(pitch_rad)
-                
-                new_x = camera_vector[0] * cos_pitch + camera_vector[2] * sin_pitch
-                new_z = -camera_vector[0] * sin_pitch + camera_vector[2] * cos_pitch
-                
-                camera_vector[0] = new_x
-                camera_vector[2] = new_z
-                
-                # Set final camera position
-                self.camera.position = transporter.properties["position"] + camera_vector
-                self.camera.lookAt = transporter.properties["position"]
+                # Check if player has reached destination
+                distance_to_destination = np.linalg.norm(direction)
+                if distance_to_destination < 10 and not self.gameState["game_won"]:  # Within 10 units
+                    self.gameState["game_won"] = True
+                    print("\n*** CONGRATULATIONS! You've reached the destination! ***\n")
 
     def DrawScene(self):
         if self.screen == 1:
@@ -405,18 +372,30 @@ class Game:
                     planet.Draw()
             
             # Draw space stations
-            if "spaceStations" in self.gameState:
-                for station in self.gameState["spaceStations"]:
+            if "spacestations" in self.gameState:
+                for station in self.gameState["spacestations"]:
                     station.Draw()
             
             # Draw transporter
             if "transporter" in self.gameState:
                 self.gameState["transporter"].Draw()
             
-            # Draw UI elements
-            if "arrow" in self.gameState:
-                self.gameState["arrow"].Draw()
-            
             if "crosshair" in self.gameState and self.gameState["transporter"].properties["view"] == 2:
                 self.gameState["crosshair"].Draw()
+
+            # Display win message if game is won
+            if self.gameState["game_won"]:
+                # Position text in center of screen
+                x_pos = self.width / 2 - 100
+                y_pos = self.height / 2
+                
+                imgui.new_frame()
+                imgui.set_next_window_position(x_pos, y_pos)
+                imgui.set_next_window_size(200, 100)
+                imgui.begin("Win Message", False, imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE)
+                imgui.text("MISSION ACCOMPLISHED!")
+                imgui.text("You've reached the destination!")
+                imgui.end()
+                imgui.render()
+                self.gui.render(imgui.get_draw_data())
 
