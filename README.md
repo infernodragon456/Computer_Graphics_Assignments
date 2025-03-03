@@ -19,6 +19,7 @@ Space Heist is a thrilling first-person space navigation game where you pilot a 
 
 - **LSHIFT**: Toggle between third-person and first-person view
 - **Mouse Movement**: When in first-person mode, look around in any direction
+- **Left Click**: When in first-person mode, shoot lasers
 
 ### Other Controls
 
@@ -45,6 +46,15 @@ Space Heist is a thrilling first-person space navigation game where you pilot a 
 
 - Third-person camera follows behind your ship
 - Camera adapts to ship orientation, giving you a clear view of where you're heading
+- First-person camera positions you on top of the ship with a crosshair for aiming
+- Lasers can be fired in first-person mode using left-click
+
+### Weapons
+
+- Red laser beams can be fired in first-person mode
+- Lasers travel in the direction you're facing
+- Use the crosshair in the center of the screen to aim
+- Lasers disappear after a few seconds
 
 ## Objectives
 
@@ -59,6 +69,7 @@ Space Heist is a thrilling first-person space navigation game where you pilot a 
 - **Planets**: Large celestial bodies with gravity (visual only)
 - **Space Stations**: Orbital installations, one of which is your destination
 - **Your Ship**: A maneuverable spacecraft with full 3D control
+- **Lasers**: Projectiles that can be fired in first-person mode
 
 ## Technical Features
 
@@ -67,6 +78,8 @@ Space Heist is a thrilling first-person space navigation game where you pilot a 
 - ImGui-based user interface for menus and HUD elements
 - 3D model loading from OBJ files
 - Collision detection for mission completion
+- First-person camera with mouse look controls
+- Crosshair HUD and projectile system
 
 ## Tips for New Players
 
@@ -74,6 +87,8 @@ Space Heist is a thrilling first-person space navigation game where you pilot a 
 - Use short bursts of thrust rather than continuous acceleration for precise control
 - Keep an eye on the distance indicator to gauge how close you are to your target
 - The direction indicator points to your destination in world-space, not relative to your ship's orientation
+- Switch to first-person mode for a more immersive experience and to shoot lasers
+- The crosshair helps aim your lasers in first-person mode
 
 ## Development
 

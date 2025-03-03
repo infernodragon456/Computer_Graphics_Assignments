@@ -83,8 +83,57 @@ def create_space_station():
     return load_obj_file(model_path)
 
 def create_laser():
-    model_path = os.path.join("assets", "objects", "models", "laser.obj")
-    return load_obj_file(model_path)
+    # Create a simple elongated cube for laser beam
+    # Each vertex has position (3 floats) followed by normal (3 floats)
+    vertices = np.array([
+        # Front face - positions and normals
+        -0.1,  0.1,  1.0,   0.0, 0.0, 1.0,  # top-right
+         0.1,  0.1,  1.0,   0.0, 0.0, 1.0,  # top-left
+         0.1, -0.1,  1.0,   0.0, 0.0, 1.0,  # bottom-left
+        -0.1, -0.1,  1.0,   0.0, 0.0, 1.0,  # bottom-right
+        
+        # Back face - positions and normals
+        -0.1,  0.1, -1.0,   0.0, 0.0, -1.0,  # top-right
+         0.1,  0.1, -1.0,   0.0, 0.0, -1.0,  # top-left
+         0.1, -0.1, -1.0,   0.0, 0.0, -1.0,  # bottom-left
+        -0.1, -0.1, -1.0,   0.0, 0.0, -1.0,  # bottom-right
+        
+        # Top face - positions and normals
+        -0.1,  0.1, -1.0,   0.0, 1.0, 0.0,  # back-right
+         0.1,  0.1, -1.0,   0.0, 1.0, 0.0,  # back-left
+         0.1,  0.1,  1.0,   0.0, 1.0, 0.0,  # front-left
+        -0.1,  0.1,  1.0,   0.0, 1.0, 0.0,  # front-right
+        
+        # Bottom face - positions and normals
+        -0.1, -0.1, -1.0,   0.0, -1.0, 0.0,  # back-right
+         0.1, -0.1, -1.0,   0.0, -1.0, 0.0,  # back-left
+         0.1, -0.1,  1.0,   0.0, -1.0, 0.0,  # front-left
+        -0.1, -0.1,  1.0,   0.0, -1.0, 0.0,  # front-right
+        
+        # Right face - positions and normals
+         0.1,  0.1, -1.0,   1.0, 0.0, 0.0,  # back-top
+         0.1, -0.1, -1.0,   1.0, 0.0, 0.0,  # back-bottom
+         0.1, -0.1,  1.0,   1.0, 0.0, 0.0,  # front-bottom
+         0.1,  0.1,  1.0,   1.0, 0.0, 0.0,  # front-top
+        
+        # Left face - positions and normals
+        -0.1,  0.1, -1.0,  -1.0, 0.0, 0.0,  # back-top
+        -0.1, -0.1, -1.0,  -1.0, 0.0, 0.0,  # back-bottom
+        -0.1, -0.1,  1.0,  -1.0, 0.0, 0.0,  # front-bottom
+        -0.1,  0.1,  1.0,  -1.0, 0.0, 0.0,  # front-top
+    ], dtype=np.float32)
+    
+    # Define indices for the cube (6 faces, 2 triangles each, 3 vertices per triangle)
+    indices = np.array([
+        0, 1, 2, 2, 3, 0,       # Front face
+        4, 5, 6, 6, 7, 4,       # Back face
+        8, 9, 10, 10, 11, 8,    # Top face
+        12, 13, 14, 14, 15, 12, # Bottom face
+        16, 17, 18, 18, 19, 16, # Right face
+        20, 21, 22, 22, 23, 20  # Left face
+    ], dtype=np.uint32)
+    
+    return vertices, indices
 
 def create_arrow():
     # Simple 2D arrow for minimap

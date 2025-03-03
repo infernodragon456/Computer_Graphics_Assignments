@@ -291,6 +291,26 @@ class Game:
                     # Update rotation to face orbit direction
                     station.properties["rotation"][1] = angle
 
+            # Update lasers
+            if "lasers" in self.gameState:
+                current_time = time['currentTime']
+                lasers_to_remove = []
+                
+                for i, laser in enumerate(self.gameState["lasers"]):
+                    # Update laser position based on velocity
+                    laser.properties["position"] += laser.properties["velocity"] * time['deltaTime']
+                    
+                    # Check if laser's lifetime has expired
+                    creation_time = laser.properties["creation_time"]
+                    lifetime = laser.properties["lifetime"]
+                    
+                    if current_time - creation_time > lifetime:
+                        lasers_to_remove.append(i)
+                
+                # Remove expired lasers (in reverse order to avoid index issues)
+                for index in sorted(lasers_to_remove, reverse=True):
+                    del self.gameState["lasers"][index]
+
             if "transporter" in self.gameState:
                 transporter = self.gameState["transporter"]
                 
@@ -458,6 +478,54 @@ class Game:
                         if mouse_dx != 0 or mouse_dy != 0:
                             print(f"Mouse movement: DX={mouse_dx}, DY={mouse_dy}")
                             print(f"Updated camera: Yaw={self.gameState['fp_yaw']}, Pitch={self.gameState['fp_pitch']}")
+                    
+                    # Handle shooting with left mouse button in first-person mode
+                    if "L_CLICK" in inputs and inputs["L_CLICK"]:
+                        # Calculate direction based on first-person yaw and pitch
+                        direction = np.array([
+                            np.cos(self.gameState["fp_yaw"]) * np.cos(self.gameState["fp_pitch"]),
+                            np.sin(self.gameState["fp_yaw"]) * np.cos(self.gameState["fp_pitch"]),
+                            np.sin(self.gameState["fp_pitch"])
+                        ], dtype=np.float32)
+                        
+                        # Normalize direction
+                        direction = direction / np.linalg.norm(direction)
+                        
+                        # Create a new laser
+                        laser_vertices, laser_indices = create_laser()
+                        
+                        # Get the ship's position as the starting point for the laser
+                        ship_position = np.copy(transporter.properties["position"])
+                        
+                        # Position the laser slightly in front of the camera to avoid self-collision
+                        laser_position = ship_position + direction * 2.0
+                        
+                        # Calculate rotation angles based on the laser direction
+                        # The laser model is oriented along the Z-axis by default, so we need to rotate it
+                        # to align with our direction vector
+                        
+                        # Calculate pitch (rotation around Y-axis)
+                        pitch = np.arctan2(direction[2], np.sqrt(direction[0]**2 + direction[1]**2))
+                        
+                        # Calculate yaw (rotation around Z-axis)
+                        yaw = np.arctan2(direction[1], direction[0])
+                        
+                        # Create the laser object with rotations set to align with the direction
+                        new_laser = Object("laser", self.shaders['standard'], {
+                            'vertices': laser_vertices,
+                            'indices': laser_indices,
+                            'position': laser_position,
+                            'rotation': np.array([0, pitch, yaw], dtype=np.float32),
+                            'scale': np.array([0.1, 0.1, 2.0], dtype=np.float32),  # Thinner and longer
+                            'colour': np.array([1.0, 0.2, 0.2, 1.0], dtype=np.float32),  # Red
+                            'velocity': direction * 20.0,  # Faster speed
+                            'creation_time': time['currentTime'],
+                            'lifetime': 3.0  # Seconds before the laser disappears
+                        })
+                        
+                        # Add the laser to the gameState
+                        self.gameState["lasers"].append(new_laser)
+                        print(f"Laser fired: Position={laser_position}, Direction={direction}")
                 
                 # Update camera based on mode
                 if self.camera:
@@ -582,6 +650,11 @@ class Game:
             if "transporter" in self.gameState:
                 self.gameState["transporter"].Draw()
             
+            # Draw lasers
+            if "lasers" in self.gameState:
+                for laser in self.gameState["lasers"]:
+                    laser.Draw()
+            
             if "crosshair" in self.gameState and self.gameState["transporter"].properties["view"] == 2:
                 self.gameState["crosshair"].Draw()
 
@@ -619,6 +692,49 @@ class Game:
                         print('entered')
                         self.gameState["game_won"] = False
                         
+                
+                imgui.end()
+                imgui.render()
+                self.gui.render(imgui.get_draw_data())
+
+            # Draw crosshair in first-person mode using ImGui
+            if self.gameState["first_person_mode"]:
+                crosshair_size = 20  # Size of the crosshair
+                line_thickness = 2.0  # Thickness of the crosshair lines
+                
+                # Position at center of screen
+                center_x = self.width / 2
+                center_y = self.height / 2
+                
+                # Create a new ImGui window for the crosshair
+                imgui.new_frame()
+                imgui.set_next_window_position(0, 0)
+                imgui.set_next_window_size(self.width, self.height)
+                imgui.begin("FP Crosshair", False, 
+                          imgui.WINDOW_NO_TITLE_BAR | 
+                          imgui.WINDOW_NO_RESIZE | 
+                          imgui.WINDOW_NO_MOVE |
+                          imgui.WINDOW_NO_SCROLLBAR |
+                          imgui.WINDOW_NO_BACKGROUND)
+                
+                # Get the drawing list
+                draw_list = imgui.get_window_draw_list()
+                
+                # Draw horizontal line
+                draw_list.add_line(
+                    center_x - crosshair_size, center_y,
+                    center_x + crosshair_size, center_y,
+                    imgui.get_color_u32_rgba(1, 1, 1, 1),  # White color
+                    line_thickness
+                )
+                
+                # Draw vertical line
+                draw_list.add_line(
+                    center_x, center_y - crosshair_size,
+                    center_x, center_y + crosshair_size,
+                    imgui.get_color_u32_rgba(1, 1, 1, 1),  # White color
+                    line_thickness
+                )
                 
                 imgui.end()
                 imgui.render()
