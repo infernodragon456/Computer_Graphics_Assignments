@@ -260,7 +260,7 @@ class Game:
                 transporter = self.gameState["transporter"]
                 
                 # Rotation speeds (in radians per frame)
-                rotation_speed = 0.01
+                rotation_speed = 0.005 * time['deltaTime'] * 60  # Scale by deltaTime, assuming 60fps baseline
                 
                 # Calculate current nose direction before rotation
                 forward = np.array([1, 0, 0], dtype=np.float32)  # Base forward vector along X-axis
@@ -370,10 +370,10 @@ class Game:
                     forward = roll_matrix @ pitch_matrix @ yaw_matrix @ forward
                     
                     # Update velocity (with speed limit)
-                    acceleration = 0.1
+                    movement_speed = 1.0 * time['deltaTime'] * 60  # Scale by deltaTime, assuming 60fps baseline
                     max_speed = 2.0
                     
-                    new_velocity = transporter.properties["velocity"] + forward * acceleration
+                    new_velocity = transporter.properties["velocity"] + forward * movement_speed
                     speed = np.linalg.norm(new_velocity)
                     if speed > max_speed:
                         new_velocity = (new_velocity / speed) * max_speed
