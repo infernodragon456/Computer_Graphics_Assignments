@@ -148,6 +148,45 @@ class Game:
                 'colour': np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32)
             })
 
+            # Initialize pirate ships
+            pirate_vertices, pirate_indices = create_pirate()
+            self.n_pirates = 3  # Number of pirate ships
+            self.gameState["pirates"] = []
+            
+            for i in range(self.n_pirates):
+                # Random position within world bounds (but not too close to player)
+                min_dist = 150  # Minimum distance from player
+                max_dist = 400  # Maximum distance from player
+                
+                angle = np.random.uniform(0, 2 * np.pi)
+                distance = np.random.uniform(min_dist, max_dist)
+                
+                # Calculate position based on angle and distance
+                pirate_pos = np.array([
+                    distance * np.cos(angle),
+                    distance * np.sin(angle),
+                    np.random.uniform(-20, 20)  # Random height
+                ], dtype=np.float32)
+                
+                # Create pirate ship
+                pirate = Object("pirate", self.shaders['standard'], {
+                    'vertices': pirate_vertices,
+                    'indices': pirate_indices,
+                    'position': pirate_pos,
+                    'rotation': np.array([0, 0, 0], dtype=np.float32),
+                    'scale': np.array([0.4, 0.4, 0.4], dtype=np.float32),
+                    'colour': np.array([0.9, 0.3, 0.3, 1.0], dtype=np.float32),  # Red color
+                    'velocity': np.array([0, 0, 0], dtype=np.float32),
+                    'speed': 15.0  # Speed at which pirates pursue the player
+                })
+                
+                self.gameState["pirates"].append(pirate)
+            
+            print(f"Created {self.n_pirates} pirate ships")
+            
+            # Add player health
+            self.gameState["player_health"] = 100
+
             # Select a random space station as destination
             if self.gameState["spacestations"]:
                 self.gameState["destination"] = np.random.choice(self.gameState["spacestations"])
@@ -310,6 +349,75 @@ class Game:
                 # Remove expired lasers (in reverse order to avoid index issues)
                 for index in sorted(lasers_to_remove, reverse=True):
                     del self.gameState["lasers"][index]
+
+            # Update pirate ships
+            if "pirates" in self.gameState and "transporter" in self.gameState:
+                transporter_pos = self.gameState["transporter"].properties["position"]
+                pirates_to_remove = []
+                
+                # Check for laser hits on pirates
+                if "lasers" in self.gameState:
+                    for i, pirate in enumerate(self.gameState["pirates"]):
+                        pirate_pos = pirate.properties["position"]
+                        
+                        for j, laser in enumerate(self.gameState["lasers"]):
+                            laser_pos = laser.properties["position"]
+                            
+                            # Calculate distance between laser and pirate
+                            distance = np.linalg.norm(pirate_pos - laser_pos)
+                            
+                            # Check if laser hit pirate (within 2 units)
+                            if distance < 2.0 and j not in lasers_to_remove:
+                                print(f"Pirate {i} hit by laser!")
+                                pirates_to_remove.append(i)
+                                lasers_to_remove.append(j)
+                                break  # One laser can only hit one pirate
+                
+                # Update pirate movement and check collisions with player
+                for i, pirate in enumerate(self.gameState["pirates"]):
+                    if i in pirates_to_remove:
+                        continue  # Skip pirates that are already marked for removal
+                    
+                    pirate_pos = pirate.properties["position"]
+                    
+                    # Calculate direction to player
+                    direction_to_player = transporter_pos - pirate_pos
+                    distance_to_player = np.linalg.norm(direction_to_player)
+                    
+                    # Check for collision with player
+                    if distance_to_player < 3.0 and self.gameState["player_health"] > 0:
+                        print("Pirate collided with player!")
+                        pirates_to_remove.append(i)
+                        
+                        # Reduce player health
+                        self.gameState["player_health"] -= 25
+                        print(f"Player health reduced to {self.gameState['player_health']}")
+                        
+                        # Check if player is defeated
+                        if self.gameState["player_health"] <= 0:
+                            print("Player defeated!")
+                            # Implement game over logic here if needed
+                    else:
+                        # Normalize direction and move pirate towards player
+                        if distance_to_player > 0:
+                            direction_normalized = direction_to_player / distance_to_player
+                            
+                            # Update pirate position
+                            pirate_speed = pirate.properties["speed"] * time['deltaTime']
+                            pirate.properties["position"] += direction_normalized * pirate_speed
+                            
+                            # Calculate rotation to face player
+                            yaw = np.arctan2(direction_normalized[1], direction_normalized[0])
+                            pirate.properties["rotation"][2] = yaw
+                
+                # Remove destroyed pirates
+                for index in sorted(pirates_to_remove, reverse=True):
+                    del self.gameState["pirates"][index]
+                
+                # Remove lasers that hit pirates (in reverse order to avoid index issues)
+                for index in sorted(lasers_to_remove, reverse=True):
+                    if index < len(self.gameState["lasers"]):  # Check if index is valid
+                        del self.gameState["lasers"][index]
 
             if "transporter" in self.gameState:
                 transporter = self.gameState["transporter"]
@@ -650,6 +758,11 @@ class Game:
             if "transporter" in self.gameState:
                 self.gameState["transporter"].Draw()
             
+            # Draw pirates
+            if "pirates" in self.gameState:
+                for pirate in self.gameState["pirates"]:
+                    pirate.Draw()
+            
             # Draw lasers
             if "lasers" in self.gameState:
                 for laser in self.gameState["lasers"]:
@@ -692,6 +805,60 @@ class Game:
                         print('entered')
                         self.gameState["game_won"] = False
                         
+                
+                imgui.end()
+                imgui.render()
+                self.gui.render(imgui.get_draw_data())
+
+            # Draw player health bar
+            if self.gameState["player_health"] >= 0:
+                # Position health bar at top left
+                health_bar_width = 200
+                health_bar_height = 20
+                x_pos = 20
+                y_pos = 20
+                
+                # Create window for health bar
+                imgui.new_frame()
+                imgui.set_next_window_position(x_pos, y_pos)
+                imgui.set_next_window_size(health_bar_width + 40, health_bar_height + 40)
+                imgui.begin("Health", False, 
+                          imgui.WINDOW_NO_TITLE_BAR | 
+                          imgui.WINDOW_NO_RESIZE | 
+                          imgui.WINDOW_NO_MOVE)
+                
+                # Draw health label
+                imgui.text("Health:")
+                imgui.same_line()
+                
+                # Calculate health percentage
+                health_percent = self.gameState["player_health"] / 100.0
+                
+                # Get drawing context
+                draw_list = imgui.get_window_draw_list()
+                
+                # Draw background bar (gray)
+                draw_list.add_rect_filled(
+                    x_pos + 70, y_pos + 20,
+                    x_pos + 70 + health_bar_width, y_pos + 20 + health_bar_height,
+                    imgui.get_color_u32_rgba(0.2, 0.2, 0.2, 1.0)
+                )
+                
+                # Draw health bar (green to red based on health)
+                bar_color = imgui.get_color_u32_rgba(
+                    1.0 - health_percent,  # Red component increases as health decreases
+                    health_percent,        # Green component decreases as health decreases
+                    0.0, 1.0
+                )
+                
+                draw_list.add_rect_filled(
+                    x_pos + 70, y_pos + 20,
+                    x_pos + 70 + health_bar_width * health_percent, y_pos + 20 + health_bar_height,
+                    bar_color
+                )
+                
+                # Show health value text
+                imgui.text(f"{self.gameState['player_health']}/100")
                 
                 imgui.end()
                 imgui.render()
